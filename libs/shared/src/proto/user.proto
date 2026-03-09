@@ -1,0 +1,64 @@
+syntax = "proto3";
+
+// ชื่อ service
+package user;
+
+// กําหนด api ว่ามีอะไรบ้าง
+service UserService{
+    rpc Register (RegisterRequest) returns (UserResponse){}
+    rpc Login (LoginRequest) returns (LoginResponse){}
+    rpc GetUser (GetUserRequest) returns (UserResponse){}
+    rpc UpdateUser (UpdateUserRequest) returns (UserResponse) {}
+    rpc DeleteUser (DeleteUserRequest) returns (DeleteUserResponse) {} 
+}
+
+message RegisterRequest {
+    string username = 1;
+    string email = 2;
+    string password = 3;
+}
+
+message LoginRequest {
+    string usernameOrEmail = 1;
+    string password = 2;
+}
+
+message UserPayload {
+    string sub = 1;
+    string username = 2;
+    string email = 3;
+    string role = 4;
+}
+
+message LoginResponse {
+    string accessToken = 1;
+    UserPayload user = 2;
+}
+
+message UserResponse {
+    string id = 1;
+    string username = 2;
+    string email = 3;
+    string role = 4;
+    string bio = 5;
+    string avatarUrl = 6;
+}
+
+message GetUserRequest {
+  string id = 1;
+}
+
+message UpdateUserRequest {
+  string id = 1;
+  string bio = 2;
+  string avatarUrl = 3;
+}
+
+message DeleteUserRequest {
+  string id = 1;
+}
+
+message DeleteUserResponse {
+  bool success = 1;
+}
+
