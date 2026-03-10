@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package post;
+
+service PostService {
+  // ฟังก์ชันขอดึงข้อมูลโพสต์ทั้งหมด (ส่งหน้าเปล่าๆ ไป แล้วรับลิสต์กลับมา)
+  rpc GetPosts (Empty) returns (PostList) {}
+}
+
+// ไม่ต้องส่ง Parameter อะไรเข้าไป เลยสร้าง Empty ไว้
+message Empty {}
+
+message PostData {
+  string id = 1;
+  string userId = 2;
+  string username = 3;
+  string content = 4;
+  int32 likes = 5;
+  string createdAt = 6;
+}
+
+// โครงสร้างสำหรับส่งกลับเป็น Array (ใช้คำว่า repeated)
+message PostList {
+  repeated PostData posts = 1;
+}
