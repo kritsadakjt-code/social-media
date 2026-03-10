@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package follow;
+
+service FollowService {
+  rpc FollowUser (FollowRequest) returns (FollowResponse) {}
+  rpc UnfollowUser (FollowRequest) returns (FollowResponse) {}
+}
+
+message FollowRequest {
+  string followerId = 1;  // ID ของตัวเราเอง (คนที่กดปุ่ม)
+  string followingId = 2; // ID ของเป้าหมาย (คนที่เราอยากติดตาม)
+}
+
+message FollowResponse {
+  bool success = 1;
+  string message = 2;
+}
