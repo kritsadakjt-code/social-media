@@ -41,6 +41,20 @@ import { join } from 'path';
         }),
         inject: [ConfigService],
       },
+      {
+        name: 'POST_SERVICE_GRPC',
+        imports: [ConfigModule],
+        useFactory: (configService: ConfigService) => ({
+          transport: Transport.GRPC,
+          options: {
+            package: 'post',
+            protoPath: join(process.cwd(), 'libs/shared/src/proto/post.proto'),
+            // ดึงค่าจาก .env เพียวๆ
+            url: `${configService.get<string>('POST_SERVICE_HOST')}:${configService.get<number>('POST_SERVICE_PORT')}`,
+          },
+        }),
+        inject: [ConfigService],
+      },
     ]),
   ],
   controllers: [AppController],

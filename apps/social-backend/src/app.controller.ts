@@ -19,6 +19,7 @@ import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { Observable } from 'rxjs';
 import { CreatePostDto } from '@app/shared/dto/users/posts/create-post.dto';
 
+// user.proto
 interface RequestWithUser extends Request {
   user: {
     userId: string;
@@ -53,19 +54,42 @@ interface UserGrpcService {
   deleteUser(data: { id: string }): Observable<{ success: boolean }>;
 }
 
+// สร้างตัวเเทน post proto
+export interface PostData {
+  id: string;
+  userId: string;
+  username: string;
+  content: string;
+  likes: number;
+  createdAt: string;
+}
+
+export interface PostListResponse {
+  posts: PostData[];
+}
+
+interface PostGrpcService {
+  // ไม่รับค่าใดๆ เพื่อให้ตรงกับ proto
+  getPosts(data: Record<string, never>): Observable<PostListResponse>;
+}
+
 @ApiTags('authentication')
 @Controller('auth')
 export class AppController implements OnModuleInit {
   private userGrpcService: UserGrpcService;
+  private postGrpcService: PostGrpcService;
 
   constructor(
     @Inject('USER_SERVICE') private readonly client: ClientGrpc,
     @Inject('POST_SERVICE') private readonly postClient: ClientProxy,
+    @Inject('POST_SERVICE_GRPC') private readonly postGrpcClient: ClientGrpc,
   ) {}
 
   onModuleInit() {
     this.userGrpcService =
       this.client.getService<UserGrpcService>('UserService');
+    this.postGrpcService =
+      this.postGrpcClient.getService<PostGrpcService>('PostService');
   }
 
   @Post('register')
@@ -128,5 +152,13 @@ export class AppController implements OnModuleInit {
 
     this.postClient.emit('create_post', payload);
     return { message: 'ระบบกำลังสร้างโพสต์ของคุณอยู่เบื้องหลัง' };
+  }
+
+  @Get('posts')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Get all posts' })
+  getFeed() {
+    return this.postGrpcService.getPosts({});
   }
 }

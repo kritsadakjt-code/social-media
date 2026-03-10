@@ -21,4 +21,22 @@ export class PostService {
     console.log(`บันทึกโพสต์สำเร็จ (ID: ${savedPost._id.toString()})`);
     return savedPost;
   }
+
+  // ดึงโพสต์ทั้งหมด เรียงจากใหม่ไปเก่า
+  async getPosts() {
+    const posts = await this.postModel.find().sort({ createdAt: -1 }).exec();
+
+    return {
+      posts: posts.map((post) => ({
+        id: post._id.toString(),
+        userId: post.userId,
+        username: post.username,
+        content: post.content,
+        likes: post.likes,
+        createdAt: post.createdAt
+          ? post.createdAt.toISOString()
+          : new Date().toISOString(),
+      })),
+    };
+  }
 }

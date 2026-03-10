@@ -1,6 +1,6 @@
 import { Controller } from '@nestjs/common';
 import { PostService } from './post-service.service';
-import { EventPattern, Payload } from '@nestjs/microservices';
+import { EventPattern, GrpcMethod, Payload } from '@nestjs/microservices';
 
 @Controller()
 export class PostServiceController {
@@ -17,5 +17,10 @@ export class PostServiceController {
     } catch (error) {
       console.error('❌ เซฟโพสต์ไม่สำเร็จ:', error);
     }
+  }
+
+  @GrpcMethod('PostService', 'GetPosts')
+  async getPosts() {
+    return this.postService.getPosts();
   }
 }
