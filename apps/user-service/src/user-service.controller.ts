@@ -21,7 +21,7 @@ export class UserServiceController {
 
   @GrpcMethod('UserService', 'Login')
   async login(loginDto: LoginDto) {
-    return this.userServiceService.Login(loginDto);
+    return this.userServiceService.login(loginDto);
   }
 
   @GrpcMethod('UserService', 'GetUser')

@@ -1,9 +1,10 @@
-import { HttpStatus, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Follow } from './follow.schema';
 import { Model } from 'mongoose';
 import { RpcException } from '@nestjs/microservices';
 import { MongoError } from 'mongodb';
+import { status } from '@grpc/grpc-js';
+import { Injectable } from '@nestjs/common';
 
 @Injectable()
 export class FollowService {
@@ -13,7 +14,7 @@ export class FollowService {
   async followUser(data: { followerId: string; followingId: string }) {
     if (data.followerId === data.followingId) {
       throw new RpcException({
-        status: HttpStatus.BAD_REQUEST,
+        code: status.INVALID_ARGUMENT,
         message: 'คุณไม่สามารถติดตามตัวเองได้',
       });
     }
@@ -29,13 +30,13 @@ export class FollowService {
     } catch (error) {
       if (error instanceof MongoError && error.code === 11000) {
         throw new RpcException({
-          status: HttpStatus.CONFLICT, // 409
+          code: status.ALREADY_EXISTS, // 409
           message: 'คุณติดตามผู้ใช้นี้ไปแล้ว',
         });
       }
 
       throw new RpcException({
-        status: HttpStatus.INTERNAL_SERVER_ERROR,
+        code: status.INTERNAL,
         message: 'เกิดข้อผิดพลาดในการติดตามผู้ใช้',
       });
     }
@@ -50,7 +51,7 @@ export class FollowService {
 
     if (!result) {
       throw new RpcException({
-        status: HttpStatus.BAD_REQUEST,
+        code: status.INVALID_ARGUMENT,
         message: 'คุณยังไม่ได้ติดตามผู้ใช้นี้',
       });
     }
