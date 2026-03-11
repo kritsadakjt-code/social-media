@@ -7,6 +7,7 @@ import {
   HttpStatus,
   Inject,
   OnModuleInit,
+  Param,
   Post,
   Put,
   Request,
@@ -73,16 +74,35 @@ interface PostGrpcService {
   getPosts(data: Record<string, never>): Observable<PostListResponse>;
 }
 
+// Follow
+export interface FollowResponse {
+  success: boolean;
+  message: string;
+}
+
+interface FollowGrpcService {
+  followUser(data: {
+    followerId: string;
+    followingId: string;
+  }): Observable<FollowResponse>;
+  unfollowUser(data: {
+    followerId: string;
+    followingId: string;
+  }): Observable<FollowResponse>;
+}
+
 @ApiTags('authentication')
 @Controller('auth')
 export class AppController implements OnModuleInit {
   private userGrpcService: UserGrpcService;
   private postGrpcService: PostGrpcService;
+  private followGrpcService: FollowGrpcService;
 
   constructor(
     @Inject('USER_SERVICE') private readonly client: ClientGrpc,
     @Inject('POST_SERVICE') private readonly postClient: ClientProxy,
     @Inject('POST_SERVICE_GRPC') private readonly postGrpcClient: ClientGrpc,
+    @Inject('FOLLOW_SERVICE') private readonly followClient: ClientGrpc,
   ) {}
 
   onModuleInit() {
@@ -90,6 +110,8 @@ export class AppController implements OnModuleInit {
       this.client.getService<UserGrpcService>('UserService');
     this.postGrpcService =
       this.postGrpcClient.getService<PostGrpcService>('PostService');
+    this.followGrpcService =
+      this.followClient.getService<FollowGrpcService>('FollowService');
   }
 
   @Post('register')
@@ -160,5 +182,34 @@ export class AppController implements OnModuleInit {
   @ApiOperation({ summary: 'Get all posts' })
   getFeed() {
     return this.postGrpcService.getPosts({});
+  }
+
+  // Follow
+  @Post('follow/:id')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Follow a user' })
+  followUser(
+    @Request() req: RequestWithUser,
+    @Param('id') followingId: string,
+  ) {
+    return this.followGrpcService.followUser({
+      followerId: req.user.userId, //id เรา
+      followingId: followingId, // เป้าหมาย
+    });
+  }
+
+  @Delete('follow/:id')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Unfollow a user' })
+  unfollowUser(
+    @Request() req: RequestWithUser,
+    @Param('id') followingId: string,
+  ) {
+    return this.followGrpcService.unfollowUser({
+      followerId: req.user.userId,
+      followingId: followingId,
+    });
   }
 }

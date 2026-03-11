@@ -1,8 +1,61 @@
+import { InjectModel } from '@nestjs/mongoose';
+import { Follow } from './follow.schema';
+import { Model } from 'mongoose';
+import { RpcException } from '@nestjs/microservices';
+import { MongoError } from 'mongodb';
+import { status } from '@grpc/grpc-js';
 import { Injectable } from '@nestjs/common';
 
 @Injectable()
-export class FollowServiceService {
-  getHello(): string {
-    return 'Hello World!';
+export class FollowService {
+  constructor(@InjectModel(Follow.name) private followModel: Model<Follow>) {}
+
+  // func follow
+  async followUser(data: { followerId: string; followingId: string }) {
+    if (data.followerId === data.followingId) {
+      throw new RpcException({
+        code: status.INVALID_ARGUMENT,
+        message: 'คุณไม่สามารถติดตามตัวเองได้',
+      });
+    }
+
+    try {
+      const newFollow = new this.followModel({
+        followerId: data.followerId,
+        followingId: data.followingId,
+      });
+
+      await newFollow.save();
+      return { success: true, message: 'ติดตามผู้ใช้นี้เรียบร้อยแล้ว' };
+    } catch (error) {
+      if (error instanceof MongoError && error.code === 11000) {
+        throw new RpcException({
+          code: status.ALREADY_EXISTS, // 409
+          message: 'คุณติดตามผู้ใช้นี้ไปแล้ว',
+        });
+      }
+
+      throw new RpcException({
+        code: status.INTERNAL,
+        message: 'เกิดข้อผิดพลาดในการติดตามผู้ใช้',
+      });
+    }
+  }
+
+  // func unfollow
+  async unfollowUser(data: { followerId: string; followingId: string }) {
+    const result = await this.followModel.findOneAndDelete({
+      followerId: data.followerId,
+      followingId: data.followingId,
+    });
+
+    if (!result) {
+      throw new RpcException({
+        code: status.INVALID_ARGUMENT,
+        message: 'คุณยังไม่ได้ติดตามผู้ใช้นี้',
+      });
+    }
+
+    return { success: true, message: 'เลิกติดตามเรียบร้อยแล้ว' };
   }
 }
