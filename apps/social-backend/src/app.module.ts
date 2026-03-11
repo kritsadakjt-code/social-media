@@ -1,5 +1,8 @@
 import { Module } from '@nestjs/common';
-import { AppController } from './app.controller';
+import { AuthController } from './auth.controller';
+import { UsersController } from './users.controller';
+import { PostsController } from './posts.controller';
+import { FollowsController } from './follows.controller';
 import { AppService } from './app.service';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -72,7 +75,12 @@ import { join } from 'path';
       },
     ]),
   ],
-  controllers: [AppController],
+  controllers: [
+    AuthController,
+    UsersController,
+    PostsController,
+    FollowsController,
+  ],
   providers: [AppService, JwtStrategy],
 })
 export class AppModule {}
