@@ -1,15 +1,21 @@
 import { InjectModel } from '@nestjs/mongoose';
 import { Follow } from './follow.schema';
 import { Model } from 'mongoose';
-import { RpcException } from '@nestjs/microservices';
+import { ClientKafka, RpcException } from '@nestjs/microservices';
 import { MongoError } from 'mongodb';
 import { status } from '@grpc/grpc-js';
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 
 @Injectable()
 export class FollowService {
-  constructor(@InjectModel(Follow.name) private followModel: Model<Follow>) {}
+  constructor(
+    @InjectModel(Follow.name) private followModel: Model<Follow>,
+    @Inject('KAFKA_SERVICE') private readonly kafkaClient: ClientKafka,
+  ) {}
 
+  async onModuleInit() {
+    await this.kafkaClient.connect();
+  }
   // func follow
   async followUser(data: { followerId: string; followingId: string }) {
     if (data.followerId === data.followingId) {
@@ -26,6 +32,13 @@ export class FollowService {
       });
 
       await newFollow.save();
+
+      this.kafkaClient.emit('follow_created', {
+        followerId: data.followerId,
+        followingId: data.followingId,
+        timestamp: new Date().toISOString(),
+      });
+
       return { success: true, message: 'ติดตามผู้ใช้นี้เรียบร้อยแล้ว' };
     } catch (error) {
       if (error instanceof MongoError && error.code === 11000) {
