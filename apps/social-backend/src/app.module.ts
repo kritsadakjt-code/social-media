@@ -29,7 +29,7 @@ import { join } from 'path';
         inject: [ConfigService],
       },
       {
-        name: 'POST_SERVICE',
+        name: 'POST_SERVICE_RABBITMQ',
         imports: [ConfigModule],
         useFactory: (configService: ConfigService) => ({
           transport: Transport.RMQ,
@@ -69,6 +69,24 @@ import { join } from 'path';
               'libs/shared/src/proto/follow.proto',
             ),
             url: `${configService.get<string>('FOLLOW_SERVICE_HOST')}:${configService.get<number>('FOLLOW_SERVICE_PORT')}`,
+          },
+        }),
+        inject: [ConfigService],
+      },
+      {
+        name: 'FEED_SERVICE',
+        imports: [ConfigModule],
+        useFactory: (configService: ConfigService) => ({
+          transport: Transport.KAFKA,
+          options: {
+            client: {
+              brokers: [
+                configService.get<string>('KAFKA_BROKER') || 'localhost:9092',
+              ],
+            },
+            consumer: {
+              groupId: 'api-gateway-feed-consumer',
+            },
           },
         }),
         inject: [ConfigService],

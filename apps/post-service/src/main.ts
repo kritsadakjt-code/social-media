@@ -40,6 +40,7 @@ async function bootstrap() {
   });
 
   await app.startAllMicroservices();
+  await app.init();
   console.log(`🚀 Post Microservice is listening on gRPC: ${postServicePort}`);
 }
 bootstrap();

@@ -23,4 +23,27 @@ export class NotificationServiceController {
     console.log(`⏰ เวลา: ${message.timestamp}`);
     console.log('====================================\n');
   }
+
+  @EventPattern('post_liked')
+  handlePostLiked(
+    @Payload()
+    message: {
+      postId: string;
+      postOwnerId: string;
+      likedByUserId: string;
+      timestamp: string;
+    },
+  ) {
+    if (message.postOwnerId === message.likedByUserId) {
+      console.log(`\n👤 ผู้ใช้ ID: ${message.likedByUserId} กดไลก์โพสต์ตัวเอง`);
+      return;
+    }
+
+    console.log('\n====================================');
+    console.log('❤️ [NEW LIKE NOTIFICATION RECEIVED!]');
+    console.log(`👤 ผู้ใช้ ID: ${message.likedByUserId}`);
+    console.log(`👉 ได้กดไลก์โพสต์ ID: ${message.postId} ของคุณ!`);
+    console.log(`⏰ เวลา: ${message.timestamp}`);
+    console.log('====================================\n');
+  }
 }

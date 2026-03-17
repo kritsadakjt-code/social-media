@@ -23,4 +23,26 @@ export class PostServiceController {
   async getPosts() {
     return this.postService.getPosts();
   }
+
+  @GrpcMethod('PostService', 'GetPostsByIds')
+  async getPostsByIds(data: { ids: string[] }) {
+    // ป้องกันกรณีส่ง Array ว่างมา
+    const idsToSearch = data.ids || [];
+    return this.postService.getPostsByIds(idsToSearch);
+  }
+
+  @GrpcMethod('PostService', 'GetPostsByUserId')
+  async getPostsByUserId(data: { userId: string }) {
+    return this.postService.getPostsByUserId(data.userId);
+  }
+
+  @GrpcMethod('PostService', 'LikePost')
+  async likePost(data: { postId: string; userId: string }) {
+    try {
+      return await this.postService.likePost(data.postId, data.userId);
+    } catch (error) {
+      console.error('❌ กดไลก์ไม่สำเร็จ:', error);
+      throw error;
+    }
+  }
 }

@@ -14,6 +14,15 @@
   "monorepo": true,
   "root": "apps/social-backend",
   "projects": {
+    "feed-service": {
+      "type": "application",
+      "root": "apps/feed-service",
+      "entryFile": "main",
+      "sourceRoot": "apps/feed-service/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/feed-service/tsconfig.app.json"
+      }
+    },
     "follow-service": {
       "type": "application",
       "root": "apps/follow-service",

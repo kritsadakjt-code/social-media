@@ -18,7 +18,7 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./apps/social-backend/test/jest-e2e.json",
-    "start:all": "concurrently -c \"cyan,magenta,yellow,blue,green\" -n \"GATEWAY,USER,POST,FOLLOW,NOTI\" \"npm run start:dev social-backend\" \"npm run start:dev user-service\" \"npm run start:dev post-service\" \"npm run start:dev follow-service\" \"npm run start:dev notification-service\""
+    "start:all": "concurrently -c \"cyan,magenta,yellow,blue,green,gray\" -n \"GATEWAY,USER,POST,FOLLOW,NOTI,FEED\" \"npm run start:dev social-backend\" \"npm run start:dev user-service\" \"npm run start:dev post-service\" \"npm run start:dev follow-service\" \"npm run start:dev notification-service\" \"npm run start:dev feed-service\""
   },
   "dependencies": {
     "@grpc/grpc-js": "^1.14.3",
@@ -38,6 +38,7 @@
     "bcrypt": "^6.0.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.4",
+    "ioredis": "^5.10.0",
     "kafkajs": "^2.2.4",
     "mongoose": "^9.2.3",
     "passport": "^0.7.0",
@@ -53,6 +54,7 @@
     "@nestjs/testing": "^11.0.1",
     "@types/bcrypt": "^6.0.0",
     "@types/express": "^5.0.0",
+    "@types/ioredis": "^5.0.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^22.10.7",
     "@types/passport-jwt": "^4.0.1",
