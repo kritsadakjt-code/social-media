@@ -71,4 +71,11 @@ export class FollowService {
 
     return { success: true, message: 'เลิกติดตามเรียบร้อยแล้ว' };
   }
+
+  async getFollowersList(userId: string): Promise<string[]> {
+    // ดึงว่าใคร follow userId นี้
+    const follow = await this.followModel.find({ followingId: userId }).exec();
+
+    return follow.map((doc) => doc.followerId);
+  }
 }

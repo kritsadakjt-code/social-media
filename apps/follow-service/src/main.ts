@@ -12,6 +12,9 @@ async function bootstrap() {
   const host = configService.get<string>('FOLLOW_SERVICE_HOST', '127.0.0.1');
   const port = configService.get<number>('FOLLOW_SERVICE_PORT', 3003);
 
+  const kafkaBroker =
+    configService.get<string>('KAFKA_BROKER') || 'localhost:9092';
+
   app.connectMicroservice<MicroserviceOptions>({
     transport: Transport.GRPC,
     options: {
@@ -21,7 +24,21 @@ async function bootstrap() {
     },
   });
 
+  app.connectMicroservice<MicroserviceOptions>({
+    transport: Transport.KAFKA,
+    options: {
+      client: {
+        brokers: [kafkaBroker],
+      },
+      consumer: {
+        groupId: 'follow-service-consumer',
+      },
+    },
+  });
+
   await app.startAllMicroservices();
+
+  await app.init();
   console.log('🚀 Follow Microservice is listening on gRPC (Port 3003)');
 }
 bootstrap();

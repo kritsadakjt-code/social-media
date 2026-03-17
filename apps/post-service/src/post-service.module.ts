@@ -4,6 +4,7 @@ import { PostService } from './post-service.service';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Post, PostSchema } from './post.schema';
+import { ClientsModule, Transport } from '@nestjs/microservices';
 
 @Module({
   imports: [
@@ -18,6 +19,25 @@ import { Post, PostSchema } from './post.schema';
     }),
 
     MongooseModule.forFeature([{ name: Post.name, schema: PostSchema }]),
+
+    ClientsModule.registerAsync([
+      {
+        name: 'KAFKA_SERVICE',
+        imports: [ConfigModule],
+        useFactory: (configService: ConfigService) => ({
+          transport: Transport.KAFKA,
+          options: {
+            client: {
+              brokers: [
+                configService.get<string>('KAFKA_BROKER') || 'localhost:9092',
+              ],
+            },
+            producerOnlyMode: true,
+          },
+        }),
+        inject: [ConfigService],
+      },
+    ]),
   ],
   controllers: [PostServiceController],
   providers: [PostService],
