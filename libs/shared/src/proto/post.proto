@@ -6,9 +6,11 @@ service PostService {
   // ฟังก์ชันขอดึงข้อมูลโพสต์ทั้งหมด (ส่งหน้าเปล่าๆ ไป แล้วรับลิสต์กลับมา)
   rpc GetPosts (Empty) returns (PostList) {}
   rpc GetPostsByIds (PostIdsRequest) returns (PostList) {}
-
   rpc GetPostsByUserId (GetPostsByUserIdRequest) returns (PostList) {}
-  rpc LikePost (LikePostRequest) returns (PostData) {}
+
+  // rpc LikePost (LikePostRequest) returns (PostData) {}
+
+  
 }
 
 // ไม่ต้องส่ง Parameter อะไรเข้าไป เลยสร้าง Empty ไว้
