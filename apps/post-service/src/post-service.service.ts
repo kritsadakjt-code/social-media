@@ -4,11 +4,13 @@ import { Post } from './post.schema';
 import { Model } from 'mongoose';
 import { ClientKafka, RpcException } from '@nestjs/microservices';
 import { status } from '@grpc/grpc-js';
+import { Comment, CommentDocument } from './comment.schema';
 
 @Injectable()
 export class PostService implements OnModuleInit {
   constructor(
     @InjectModel(Post.name) private postModel: Model<Post>,
+    @InjectModel(Comment.name) private commentModel: Model<CommentDocument>,
     @Inject('KAFKA_SERVICE') private readonly kafkaClient: ClientKafka,
   ) {}
 
@@ -125,6 +127,67 @@ export class PostService implements OnModuleInit {
       likes: updatedPost.likes,
       createdAt:
         updatedPost.createdAt?.toISOString() || new Date().toISOString(),
+    };
+  }
+
+  async addComment(data: {
+    postId: string;
+    userId: string;
+    username: string;
+    content: string;
+  }) {
+    // check ว่ามีโพสต์นี้มั้ย
+    const post = await this.postModel.findById(data.postId);
+    if (!post) {
+      throw new RpcException({
+        code: status.NOT_FOUND,
+        message: 'ไม่พบโพสต์นี้ในระบบ',
+      });
+    }
+
+    const newComment = new this.commentModel({
+      postId: data.postId,
+      userId: data.userId,
+      username: data.username,
+      content: data.content,
+    });
+
+    const savedComment = await newComment.save();
+
+    this.kafkaClient.emit('post_commented', {
+      postId: data.postId,
+      postOwnerId: post.userId, // เจ้าของโพสต์ (คนที่จะโดนแจ้งเตือน)
+      commenterId: data.userId, // คนที่มาคอมเมนต์
+      commenterName: data.username,
+      content: data.content,
+      timestamp: savedComment.createdAt?.toISOString(),
+    });
+
+    return {
+      id: savedComment._id.toString(),
+      postId: savedComment.postId,
+      userId: savedComment.userId,
+      username: savedComment.username,
+      content: savedComment.content,
+      createdAt: savedComment.createdAt?.toISOString(),
+    };
+  }
+
+  async getCommentsByPostId(postId: string) {
+    const comment = await this.commentModel
+      .find({ postId: postId })
+      .sort({ createdAt: 1 })
+      .exec();
+
+    return {
+      comment: comment.map((c) => ({
+        id: c._id.toString(),
+        postId: c.postId,
+        userId: c.userId,
+        username: c.username,
+        content: c.content,
+        createdAt: c.createdAt?.toISOString(),
+      })),
     };
   }
 }

@@ -57,4 +57,39 @@ export class NotificationServiceController {
     });
     console.log('====================================\n');
   }
+
+  // comment from post
+  @EventPattern('post_commented')
+  handlePostCommented(
+    @Payload()
+    message: {
+      postId: string;
+      postOwnerId: string;
+      commenterId: string;
+      commenterName: string;
+      content: string;
+      timestamp: string;
+    },
+  ) {
+    // ถ้าคอมเเมนต์โพสต์ตัวเองไม่ต้องเเจ้งเตือน
+    if (message.postOwnerId === message.commenterId) {
+      console.log(`\n👤 ผู้ใช้ ID: ${message.postOwnerId} คอมเมนต์โพสต์ตัวเอง`);
+      return;
+    }
+
+    console.log('\n====================================');
+    console.log('💬 [NEW COMMENT NOTIFICATION RECEIVED!]');
+    console.log(`👤 ผู้ใช้: ${message.commenterName} (${message.commenterId})`);
+    console.log(`👉 ได้คอมเมนต์โพสต์ ID: ${message.postId} ของคุณ!`);
+    console.log(`📝 ข้อความ: "${message.content}"`);
+
+    this.notificationGateway.sendNotificationToUser(message.postOwnerId, {
+      title: 'มีคนคอมเมนต์โพสต์ของคุณ!',
+      body: `${message.commenterName} คอมเมนต์ว่า: "${message.content}"`,
+      postId: message.postId,
+      time: message.timestamp,
+    });
+
+    console.log('====================================\n');
+  }
 }
