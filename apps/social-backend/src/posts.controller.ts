@@ -1,3 +1,4 @@
+import { Comment } from '../../post-service/src/comment.schema';
 import {
   Body,
   Controller,
@@ -18,6 +19,7 @@ import type {
 import { CreatePostDto } from '@app/shared/dto/users/posts/create-post.dto';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { firstValueFrom, Observable } from 'rxjs';
+import { CreateCommentDto } from '@app/shared/dto/users/posts/create-comment.dto';
 
 interface RequestWithUser extends Request {
   user: { userId: string; username: string; role: string };
@@ -37,11 +39,34 @@ export interface PostListResponse {
   posts: PostData[];
 }
 
+export interface CommentData {
+  id: string;
+  postId: string;
+  userId: string;
+  username: string;
+  content: string;
+  createdAt: string;
+}
+
+export interface CommentListResponse {
+  comments: CommentData[];
+}
+
 interface PostGrpcService {
   getPosts(data: Record<string, never>): Observable<PostListResponse>;
   getPostsByIds(data: { ids: string[] }): Observable<PostListResponse>;
   getPostsByUserId(data: { userId: string }): Observable<PostListResponse>;
   likePost(data: { postId: string; userId: string }): Observable<PostData>;
+
+  addComment(data: {
+    postId: string;
+    userId: string;
+    username: string;
+    content: string;
+  }): Observable<CommentData>;
+  getCommentsByPostId(data: {
+    postId: string;
+  }): Observable<CommentListResponse>;
 }
 
 @ApiTags('Posts')
@@ -88,6 +113,7 @@ export class PostsController implements OnModuleInit {
     return this.postGrpcService.getPosts({});
   }
 
+  // ดึงหน้า feed ว่าคนนั้นต้องเห็น post อะไรบ้าง
   @Get('feed')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
@@ -110,6 +136,7 @@ export class PostsController implements OnModuleInit {
     return postsResult;
   }
 
+  // get profile
   @Get('user/:userId')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
@@ -119,6 +146,7 @@ export class PostsController implements OnModuleInit {
     return this.postGrpcService.getPostsByUserId({ userId: targetUserId });
   }
 
+  // กดไลก์
   @Post(':id/like')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
@@ -130,5 +158,35 @@ export class PostsController implements OnModuleInit {
       postId: postId,
       userId: req.user.userId,
     });
+  }
+
+  // add comment
+  @Post(':id/comments')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Add a comment to a post' })
+  addComment(
+    @Request() req: RequestWithUser,
+    @Param('id') postId: string,
+    @Body() comment: CreateCommentDto,
+  ) {
+    console.log(`[GATEWAY] User ${req.user.username} คอมเมนต์โพสต์ ${postId}`);
+
+    return this.postGrpcService.addComment({
+      postId: postId,
+      userId: req.user.userId,
+      username: req.user.username,
+      content: comment.content,
+    });
+  }
+
+  // ดึงคอมเมนต์ทั้งหมดของโพสต์
+  @Get(':id/comments')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Get comments of a post' })
+  getComments(@Param('id') postId: string) {
+    console.log(`[GATEWAY] ดึงคอมเมนต์ของโพสต์: ${postId}`);
+    return this.postGrpcService.getCommentsByPostId({ postId });
   }
 }

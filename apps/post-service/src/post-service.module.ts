@@ -5,6 +5,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Post, PostSchema } from './post.schema';
 import { ClientsModule, Transport } from '@nestjs/microservices';
+import { Comment, CommentSchema } from './comment.schema';
 
 @Module({
   imports: [
@@ -18,7 +19,10 @@ import { ClientsModule, Transport } from '@nestjs/microservices';
       inject: [ConfigService],
     }),
 
-    MongooseModule.forFeature([{ name: Post.name, schema: PostSchema }]),
+    MongooseModule.forFeature([
+      { name: Post.name, schema: PostSchema },
+      { name: Comment.name, schema: CommentSchema },
+    ]),
 
     ClientsModule.registerAsync([
       {

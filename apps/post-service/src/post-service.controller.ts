@@ -45,4 +45,19 @@ export class PostServiceController {
       throw error;
     }
   }
+
+  @GrpcMethod('PostService', 'AddComment')
+  async addComment(data: {
+    postId: string;
+    userId: string;
+    username: string;
+    content: string;
+  }) {
+    return this.postService.addComment(data);
+  }
+
+  @GrpcMethod('PostService', 'GetCommentsByPostId')
+  async getCommentsByPostId(data: { postId: string }) {
+    return this.postService.getCommentsByPostId(data.postId);
+  }
 }

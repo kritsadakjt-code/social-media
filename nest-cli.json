@@ -3,9 +3,7 @@
   "collection": "@nestjs/schematics",
   "sourceRoot": "apps/social-backend/src",
   "compilerOptions": {
-    "assets": [
-      "**/*.proto"
-    ],
+    "assets": ["**/*.proto"],
     "watchAssets": true,
     "deleteOutDir": true,
     "webpack": true,

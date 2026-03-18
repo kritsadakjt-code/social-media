@@ -8,8 +8,10 @@ service PostService {
   rpc GetPostsByIds (PostIdsRequest) returns (PostList) {}
   rpc GetPostsByUserId (GetPostsByUserIdRequest) returns (PostList) {}
 
-  // rpc LikePost (LikePostRequest) returns (PostData) {}
+  rpc LikePost (LikePostRequest) returns (PostData) {}
 
+  rpc AddComment (AddCommentRequest) returns (CommentData) {}
+  rpc GetCommentsByPostId (GetCommentsRequest) returns (CommentListResponse) {}
   
 }
 
@@ -42,4 +44,28 @@ message GetPostsByUserIdRequest {
 message LikePostRequest {
   string postId = 1;
   string userId = 2; // คนที่กดไลก์
+}
+
+message AddCommentRequest {
+  string postId = 1;
+  string userId = 2;
+  string username = 3;
+  string content = 4;
+}
+
+message GetCommentsRequest {
+  string postId = 1;
+}
+
+message CommentData {
+  string id = 1;
+  string postId = 2;
+  string userId = 3;
+  string username = 4;
+  string content = 5;
+  string createdAt = 6;
+}
+
+message CommentListResponse {
+  repeated CommentData comments = 1;
 }

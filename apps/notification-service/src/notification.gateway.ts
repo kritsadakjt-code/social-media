@@ -49,9 +49,7 @@ export class NotificationGateway
         `⚡ [WebSockets] ยิงแจ้งเตือนทะลุจอไปหา User: ${userId} สำเร็จ!`,
       );
     } else {
-      console.log(
-        `💤 [WebSockets] User: ${userId} ไม่ได้เปิดแอปอยู่ เก็บลง Database แทน`,
-      );
+      console.log(`💤 [WebSockets] User: ${userId} ไม่ได้เปิดแอปอยู่`);
     }
   }
 }
