@@ -25,6 +25,11 @@ async function bootstrap() {
     },
   });
   await app.startAllMicroservices();
+
+  await app.listen(3004);
   console.log('🔔 Notification Microservice is listening on Kafka...');
+  console.log(
+    '🚀 Notification Service is listening on HTTP Port 3004 (For WebSockets)',
+  );
 }
 bootstrap();

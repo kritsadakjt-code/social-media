@@ -1,10 +1,14 @@
 import { Controller } from '@nestjs/common';
 import { NotificationService } from './notification-service.service';
 import { EventPattern, Payload } from '@nestjs/microservices';
+import { NotificationGateway } from './notification.gateway';
 
 @Controller()
 export class NotificationServiceController {
-  constructor(private readonly notificationService: NotificationService) {}
+  constructor(
+    private readonly notificationService: NotificationService,
+    private readonly notificationGateway: NotificationGateway,
+  ) {}
 
   // รอฟัง event follow_created
   @EventPattern('follow_created')
@@ -44,6 +48,13 @@ export class NotificationServiceController {
     console.log(`👤 ผู้ใช้ ID: ${message.likedByUserId}`);
     console.log(`👉 ได้กดไลก์โพสต์ ID: ${message.postId} ของคุณ!`);
     console.log(`⏰ เวลา: ${message.timestamp}`);
+
+    this.notificationGateway.sendNotificationToUser(message.postOwnerId, {
+      title: 'มีคนกดไลก์โพสต์ของคุณ!',
+      body: `User ID: ${message.likedByUserId} กดไลก์โพสต์ของคุณ`,
+      postId: message.postId,
+      time: message.timestamp,
+    });
     console.log('====================================\n');
   }
 }
