@@ -8,6 +8,18 @@ import {
 import Redis from 'ioredis';
 import { firstValueFrom } from 'rxjs';
 
+interface PostItem {
+  id: string;
+  userId: string;
+  username: string;
+  content: string;
+  likes: number;
+  createdAt: string;
+}
+
+interface UserPostsResponse {
+  posts: PostItem[];
+}
 @Controller()
 export class FeedServiceController implements OnModuleInit {
   constructor(
@@ -17,6 +29,7 @@ export class FeedServiceController implements OnModuleInit {
 
   async onModuleInit() {
     this.kafkaClient.subscribeToResponseOf('get_followers');
+    this.kafkaClient.subscribeToResponseOf('get_posts_for_feed_cleanup');
     await this.kafkaClient.connect();
   }
 
@@ -74,5 +87,44 @@ export class FeedServiceController implements OnModuleInit {
 
     console.log(`ดึง Post IDs สำเร็จ จำนวน ${postIds.length} โพสต์`);
     return postIds;
+  }
+
+  // 🌟 2. ดักฟัง Event เลิกติดตาม
+  @EventPattern('unfollowed')
+  async handleUnfollowed(
+    @Payload() message: { followerId: string; followingId: string },
+  ) {
+    console.log(
+      `\n🧹 [FEED CLEANUP] User ${message.followerId} เลิกติดตาม ${message.followingId}`,
+    );
+
+    try {
+      const userPosts = await firstValueFrom<UserPostsResponse>(
+        this.kafkaClient.send('get_posts_for_feed_cleanup', {
+          userId: message.followingId,
+        }),
+      );
+
+      if (!userPosts || !userPosts.posts || userPosts.posts.length === 0) {
+        console.log('🤷‍♂️ คนนี้ไม่มีโพสต์ให้ลบออกจาก Feed เลย');
+        return;
+      }
+
+      // 🌟
+      const postIdsToRemove = userPosts.posts.map((post) => post.id);
+
+      console.log(
+        `กำลังลบ ${postIdsToRemove.length} โพสต์ ออกจาก Feed ของ ${message.followerId}...`,
+      );
+
+      const pipeline = this.redis.pipeline();
+      pipeline.zrem(`feed:${message.followerId}`, ...postIdsToRemove);
+      await pipeline.exec();
+
+      console.log('✅ ล้างหน้า Feed สำเร็จ!\n');
+    } catch (error) {
+      const err = error as Error;
+      console.error('❌ ล้างหน้า Feed ไม่สำเร็จ:', err.message || err);
+    }
   }
 }

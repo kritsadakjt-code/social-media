@@ -1,6 +1,11 @@
 import { Controller } from '@nestjs/common';
 import { PostService } from './post-service.service';
-import { EventPattern, GrpcMethod, Payload } from '@nestjs/microservices';
+import {
+  EventPattern,
+  GrpcMethod,
+  MessagePattern,
+  Payload,
+} from '@nestjs/microservices';
 
 @Controller()
 export class PostServiceController {
@@ -59,5 +64,10 @@ export class PostServiceController {
   @GrpcMethod('PostService', 'GetCommentsByPostId')
   async getCommentsByPostId(data: { postId: string }) {
     return this.postService.getCommentsByPostId(data.postId);
+  }
+
+  @MessagePattern('get_posts_for_feed_cleanup')
+  async getPostsForCleanup(@Payload() data: { userId: string }) {
+    return this.postService.getPostsByUserId(data.userId);
   }
 }
