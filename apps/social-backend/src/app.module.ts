@@ -1,5 +1,8 @@
 import { Module } from '@nestjs/common';
-import { AppController } from './app.controller';
+import { AuthController } from './auth.controller';
+import { UsersController } from './users.controller';
+import { PostsController } from './posts.controller';
+import { FollowsController } from './follows.controller';
 import { AppService } from './app.service';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -26,7 +29,7 @@ import { join } from 'path';
         inject: [ConfigService],
       },
       {
-        name: 'POST_SERVICE',
+        name: 'POST_SERVICE_RABBITMQ',
         imports: [ConfigModule],
         useFactory: (configService: ConfigService) => ({
           transport: Transport.RMQ,
@@ -49,15 +52,53 @@ import { join } from 'path';
           options: {
             package: 'post',
             protoPath: join(process.cwd(), 'libs/shared/src/proto/post.proto'),
-            // ดึงค่าจาก .env เพียวๆ
             url: `${configService.get<string>('POST_SERVICE_HOST')}:${configService.get<number>('POST_SERVICE_PORT')}`,
+          },
+        }),
+        inject: [ConfigService],
+      },
+      {
+        name: 'FOLLOW_SERVICE',
+        imports: [ConfigModule],
+        useFactory: (configService: ConfigService) => ({
+          transport: Transport.GRPC,
+          options: {
+            package: 'follow',
+            protoPath: join(
+              process.cwd(),
+              'libs/shared/src/proto/follow.proto',
+            ),
+            url: `${configService.get<string>('FOLLOW_SERVICE_HOST')}:${configService.get<number>('FOLLOW_SERVICE_PORT')}`,
+          },
+        }),
+        inject: [ConfigService],
+      },
+      {
+        name: 'FEED_SERVICE',
+        imports: [ConfigModule],
+        useFactory: (configService: ConfigService) => ({
+          transport: Transport.KAFKA,
+          options: {
+            client: {
+              brokers: [
+                configService.get<string>('KAFKA_BROKER') || 'localhost:9092',
+              ],
+            },
+            consumer: {
+              groupId: 'api-gateway-feed-consumer',
+            },
           },
         }),
         inject: [ConfigService],
       },
     ]),
   ],
-  controllers: [AppController],
+  controllers: [
+    AuthController,
+    UsersController,
+    PostsController,
+    FollowsController,
+  ],
   providers: [AppService, JwtStrategy],
 })
 export class AppModule {}

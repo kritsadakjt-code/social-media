@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>📱 หน้าจอของเจ้าของโพสต์</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+      body {
+        font-family: sans-serif;
+        padding: 20px;
+        background: #f0f2f5;
+      }
+      #alerts {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .notification {
+        background: white;
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        border-left: 5px solid #ff4757;
+        animation: slideIn 0.5s ease-out;
+      }
+      @keyframes slideIn {
+        from {
+          transform: translateX(100%);
+          opacity: 0;
+        }
+        to {
+          transform: translateX(0);
+          opacity: 1;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <h2>🔔 การแจ้งเตือนของคุณ</h2>
+    <div id="alerts">รอรับการแจ้งเตือน...</div>
+
+    <script>
+      //  User ID ของคนที่จะโดนกดไลก์โพสต์
+      const MY_USER_ID = '69ae3e2f9aa69fb3f7210844';
+
+      // เชื่อมต่อไปที่ Notification Service (พอร์ต 3004)
+      const socket = io('http://localhost:3004', {
+        query: { userId: MY_USER_ID },
+      });
+
+      socket.on('connect', () => {
+        console.log('🟢 เชื่อมต่อกับเซิร์ฟเวอร์สำเร็จ!');
+      });
+
+      //  เมื่อได้รับสัญญาณ 'new_notification' จากหลังบ้าน
+      socket.on('new_notification', (data) => {
+        console.log('🚨 มีแจ้งเตือนเข้า!', data);
+
+        // สร้างกล่องข้อความเด้งขึ้นมาบนหน้าจอ!
+        const alertBox = document.createElement('div');
+        alertBox.className = 'notification';
+        alertBox.innerHTML = `<strong>${data.title}</strong><br>${data.body} <br><small>${new Date(data.time).toLocaleTimeString()}</small>`;
+
+        // เอาไปแปะไว้บนสุด
+        const alertsDiv = document.getElementById('alerts');
+        if (alertsDiv.innerHTML === 'รอรับการแจ้งเตือน...')
+          alertsDiv.innerHTML = '';
+        alertsDiv.prepend(alertBox);
+      });
+    </script>
+  </body>
+</html>

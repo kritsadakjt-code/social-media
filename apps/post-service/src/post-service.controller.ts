@@ -1,6 +1,11 @@
 import { Controller } from '@nestjs/common';
 import { PostService } from './post-service.service';
-import { EventPattern, GrpcMethod, Payload } from '@nestjs/microservices';
+import {
+  EventPattern,
+  GrpcMethod,
+  MessagePattern,
+  Payload,
+} from '@nestjs/microservices';
 
 @Controller()
 export class PostServiceController {
@@ -22,5 +27,47 @@ export class PostServiceController {
   @GrpcMethod('PostService', 'GetPosts')
   async getPosts() {
     return this.postService.getPosts();
+  }
+
+  @GrpcMethod('PostService', 'GetPostsByIds')
+  async getPostsByIds(data: { ids: string[] }) {
+    // ป้องกันกรณีส่ง Array ว่างมา
+    const idsToSearch = data.ids || [];
+    return this.postService.getPostsByIds(idsToSearch);
+  }
+
+  @GrpcMethod('PostService', 'GetPostsByUserId')
+  async getPostsByUserId(data: { userId: string }) {
+    return this.postService.getPostsByUserId(data.userId);
+  }
+
+  @GrpcMethod('PostService', 'LikePost')
+  async likePost(data: { postId: string; userId: string }) {
+    try {
+      return await this.postService.likePost(data.postId, data.userId);
+    } catch (error) {
+      console.error('❌ กดไลก์ไม่สำเร็จ:', error);
+      throw error;
+    }
+  }
+
+  @GrpcMethod('PostService', 'AddComment')
+  async addComment(data: {
+    postId: string;
+    userId: string;
+    username: string;
+    content: string;
+  }) {
+    return this.postService.addComment(data);
+  }
+
+  @GrpcMethod('PostService', 'GetCommentsByPostId')
+  async getCommentsByPostId(data: { postId: string }) {
+    return this.postService.getCommentsByPostId(data.postId);
+  }
+
+  @MessagePattern('get_posts_for_feed_cleanup')
+  async getPostsForCleanup(@Payload() data: { userId: string }) {
+    return this.postService.getPostsByUserId(data.userId);
   }
 }

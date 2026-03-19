@@ -1,5 +1,5 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common'; // <-- เพิ่มตัวนี้
+import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
@@ -8,7 +8,6 @@ import { GlobalRpcExceptionFilter } from './common/filters/rpc-exception.filters
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // เปิดใช้งานระบบตรวจสอบข้อมูล (Validation) ทั่วทั้ง API Gateway
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true, // ตัดฟิลด์ขยะที่ส่งมาเกิน DTO ทิ้ง

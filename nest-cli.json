@@ -12,6 +12,15 @@
   "monorepo": true,
   "root": "apps/social-backend",
   "projects": {
+    "feed-service": {
+      "type": "application",
+      "root": "apps/feed-service",
+      "entryFile": "main",
+      "sourceRoot": "apps/feed-service/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/feed-service/tsconfig.app.json"
+      }
+    },
     "follow-service": {
       "type": "application",
       "root": "apps/follow-service",
@@ -19,6 +28,15 @@
       "sourceRoot": "apps/follow-service/src",
       "compilerOptions": {
         "tsConfigPath": "apps/follow-service/tsconfig.app.json"
+      }
+    },
+    "notification-service": {
+      "type": "application",
+      "root": "apps/notification-service",
+      "entryFile": "main",
+      "sourceRoot": "apps/notification-service/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/notification-service/tsconfig.app.json"
       }
     },
     "post-service": {

@@ -5,6 +5,14 @@ package post;
 service PostService {
   // ฟังก์ชันขอดึงข้อมูลโพสต์ทั้งหมด (ส่งหน้าเปล่าๆ ไป แล้วรับลิสต์กลับมา)
   rpc GetPosts (Empty) returns (PostList) {}
+  rpc GetPostsByIds (PostIdsRequest) returns (PostList) {}
+  rpc GetPostsByUserId (GetPostsByUserIdRequest) returns (PostList) {}
+
+  rpc LikePost (LikePostRequest) returns (PostData) {}
+
+  rpc AddComment (AddCommentRequest) returns (CommentData) {}
+  rpc GetCommentsByPostId (GetCommentsRequest) returns (CommentListResponse) {}
+  
 }
 
 // ไม่ต้องส่ง Parameter อะไรเข้าไป เลยสร้าง Empty ไว้
@@ -22,4 +30,42 @@ message PostData {
 // โครงสร้างสำหรับส่งกลับเป็น Array (ใช้คำว่า repeated)
 message PostList {
   repeated PostData posts = 1;
+}
+
+// reapeated ก็คือ array
+message PostIdsRequest {
+  repeated string ids = 1; 
+}
+
+message GetPostsByUserIdRequest {
+  string userId = 1;
+}
+
+message LikePostRequest {
+  string postId = 1;
+  string userId = 2; // คนที่กดไลก์
+}
+
+message AddCommentRequest {
+  string postId = 1;
+  string userId = 2;
+  string username = 3;
+  string content = 4;
+}
+
+message GetCommentsRequest {
+  string postId = 1;
+}
+
+message CommentData {
+  string id = 1;
+  string postId = 2;
+  string userId = 3;
+  string username = 4;
+  string content = 5;
+  string createdAt = 6;
+}
+
+message CommentListResponse {
+  repeated CommentData comments = 1;
 }

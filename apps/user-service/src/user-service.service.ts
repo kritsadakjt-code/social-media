@@ -6,6 +6,7 @@ import { Model } from 'mongoose';
 import { LoginDto, RegisterDto } from '@app/shared';
 import { RpcException } from '@nestjs/microservices';
 import { JwtService } from '@nestjs/jwt';
+import { status } from '@grpc/grpc-js';
 
 @Injectable()
 export class UserServiceService {
@@ -24,13 +25,13 @@ export class UserServiceService {
     if (existUser) {
       if (existUser.username === username) {
         throw new RpcException({
-          status: 409,
+          code: status.ALREADY_EXISTS,
           message: 'username นี้ถูกใช้งานเเล้ว',
         });
       }
       if (existUser.email === email) {
         throw new RpcException({
-          status: 409,
+          code: status.ALREADY_EXISTS,
           message: 'Email นี้ถูกใช้งานแล้ว',
         });
       }
@@ -53,7 +54,7 @@ export class UserServiceService {
     return userResponse;
   }
 
-  async Login(loginDto: LoginDto) {
+  async login(loginDto: LoginDto) {
     const { usernameOrEmail, password } = loginDto;
 
     const user = await this.userModel.findOne({
@@ -62,7 +63,7 @@ export class UserServiceService {
 
     if (!user) {
       throw new RpcException({
-        status: 404,
+        code: status.NOT_FOUND,
         message: 'not found username or email',
       });
     }
@@ -70,7 +71,10 @@ export class UserServiceService {
     const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
 
     if (!isPasswordValid) {
-      throw new RpcException({ status: 401, message: 'incorrect password' });
+      throw new RpcException({
+        code: status.UNAUTHENTICATED,
+        message: 'incorrect password',
+      });
     }
 
     const payload = { sub: user._id, username: user.username, role: user.role };
@@ -90,7 +94,10 @@ export class UserServiceService {
   async getUser(id: string) {
     const user = await this.userModel.findById(id);
     if (!user) {
-      throw new RpcException({ status: 404, message: 'User Not Found' });
+      throw new RpcException({
+        code: status.NOT_FOUND,
+        message: 'User Not Found',
+      });
     }
 
     return {
@@ -109,7 +116,10 @@ export class UserServiceService {
   ) {
     const user = await this.userModel.findById(id);
     if (!user) {
-      throw new RpcException({ status: 404, message: 'User not found' });
+      throw new RpcException({
+        code: status.NOT_FOUND,
+        message: 'User not found',
+      });
     }
 
     // อัปเดตเฉพาะฟิลด์ที่มีการส่งมา
@@ -126,7 +136,10 @@ export class UserServiceService {
   async deleteUser(id: string) {
     const result = await this.userModel.findByIdAndDelete(id);
     if (!result)
-      throw new RpcException({ status: 404, message: 'User not found' });
+      throw new RpcException({
+        code: status.NOT_FOUND,
+        message: 'User not found',
+      });
     return { success: true };
   }
 }
