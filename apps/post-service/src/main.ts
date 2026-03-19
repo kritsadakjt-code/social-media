@@ -19,6 +19,11 @@ async function bootstrap() {
     '127.0.0.1',
   );
 
+  const kafkaBroker = configService.get<string>(
+    'KAFKA_BROKER',
+    'localhost:9092',
+  );
+
   // rabbitMQ
   app.connectMicroservice<MicroserviceOptions>({
     transport: Transport.RMQ,
@@ -39,6 +44,17 @@ async function bootstrap() {
     },
   });
 
+  app.connectMicroservice<MicroserviceOptions>({
+    transport: Transport.KAFKA,
+    options: {
+      client: {
+        brokers: [kafkaBroker],
+      },
+      consumer: {
+        groupId: 'post-service-consumer',
+      },
+    },
+  });
   await app.startAllMicroservices();
   await app.init();
   console.log(`🚀 Post Microservice is listening on gRPC: ${postServicePort}`);

@@ -69,6 +69,11 @@ export class FollowService {
       });
     }
 
+    this.kafkaClient.emit('unfollowed', {
+      followerId: data.followerId,
+      followingId: data.followingId,
+    });
+
     return { success: true, message: 'เลิกติดตามเรียบร้อยแล้ว' };
   }
 
