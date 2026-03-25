@@ -7,9 +7,10 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { JwtAuthGuard } from './auth/jwt-auth.guard';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+
+import type { RequestWithUser } from '../interfaces/request.interface';
 import { FollowsService } from './follows.service';
-import type { RequestWithUser } from './interfaces/request.interface';
 
 @ApiTags('Follows')
 @Controller('follows')
