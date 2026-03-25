@@ -9,6 +9,10 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtStrategy } from './auth/jwt.strategy';
 import { join } from 'path';
 import { ChatController } from './chat.controller';
+import { AuthService } from './auth.service';
+import { UsersService } from './users.service';
+import { FollowsService } from './follows.service';
+import { PostsService } from './posts.service';
 
 @Module({
   imports: [
@@ -114,6 +118,13 @@ import { ChatController } from './chat.controller';
     FollowsController,
     ChatController,
   ],
-  providers: [ChatService, JwtStrategy],
+  providers: [
+    ChatService,
+    JwtStrategy,
+    AuthService,
+    UsersService,
+    FollowsService,
+    PostsService,
+  ],
 })
 export class AppModule {}

@@ -34,16 +34,6 @@ export class ChatService implements OnModuleInit {
     }
 
     try {
-      // รับข้อมูลจาก grpc
-      //   return await firstValueFrom(
-      //     this.chatService.getChatHistory({
-      //       userId1: currentUserId,
-      //       userId2: targetUserId,
-      //       limit: query.limit,
-      //       cursor: query.cursor,
-      //     }),
-      //   );
-
       const response = await firstValueFrom(
         this.chatService.getChatHistory({
           userId1: currentUserId,
