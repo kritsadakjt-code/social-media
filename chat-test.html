@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="UTF-8" />
+    <title>ทดสอบ Socket.io Chat</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  </head>
+  <body style="font-family: Arial; padding: 20px">
+    <h2>ระบบทดสอบ Chat Service</h2>
+
+    <div>
+      <label>ID ของฉัน (ผู้ส่ง): </label>
+      <input type="text" id="myId" placeholder="เช่น 123" />
+      <button onclick="connectChat()">1. เชื่อมต่อระบบแชท</button>
+    </div>
+    <br />
+
+    <div id="chatArea" style="display: none">
+      <label>ID ของเพื่อน (ผู้รับ): </label>
+      <input type="text" id="receiverId" placeholder="เช่น 456" /><br /><br />
+
+      <label>ข้อความ: </label>
+      <input type="text" id="message" placeholder="พิมพ์ข้อความ..." />
+      <button onclick="sendMessage()">2. ส่งข้อความ</button>
+
+      <h3>ประวัติข้อความ (Real-time):</h3>
+      <ul
+        id="messageList"
+        style="background: #f0f0f0; padding: 20px; border-radius: 8px"
+      ></ul>
+    </div>
+
+    <script>
+      let socket;
+
+      function connectChat() {
+        const myId = document.getElementById('myId').value;
+        if (!myId) return alert('กรุณาใส่ ID ของคุณก่อน');
+
+        //
+        socket = io('http://localhost:3005/chat', {
+          query: { userId: myId },
+        });
+
+        socket.on('connect', () => {
+          alert('✅ เชื่อมต่อสำเร็จ!');
+          document.getElementById('chatArea').style.display = 'block';
+        });
+
+        // ดักฟังข้อความที่คนอื่นส่งมาหาเรา
+        socket.on('receive_message', (data) => {
+          const li = document.createElement('li');
+          li.innerHTML = `<b>📥 ได้รับข้อความ:</b> ${data.content} <small>(จาก: ${data.senderId})</small> เวลา ${data.createdAt}`;
+          document.getElementById('messageList').appendChild(li);
+        });
+      }
+
+      function sendMessage() {
+        const receiverId = document.getElementById('receiverId').value;
+        const content = document.getElementById('message').value;
+
+        const payload = { receiverId, content };
+
+        // ยิง Event ส่งข้อความไปหาเซิร์ฟเวอร์
+        socket.emit('send_message', payload, (response) => {
+          if (response.status === 'success') {
+            const li = document.createElement('li');
+            li.innerHTML = `<b>📤 ส่งสำเร็จ:</b> ${content}`;
+            document.getElementById('messageList').appendChild(li);
+            document.getElementById('message').value = '';
+          } else {
+            alert('ส่งข้อความไม่สำเร็จ: ' + response.error);
+          }
+        });
+      }
+    </script>
+  </body>
+</html>
