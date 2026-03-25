@@ -18,7 +18,7 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./apps/social-backend/test/jest-e2e.json",
-    "start:all": "concurrently -c \"cyan,magenta,yellow,blue,green,gray\" -n \"GATEWAY,USER,POST,FOLLOW,NOTI,FEED\" \"npm run start:dev social-backend\" \"npm run start:dev user-service\" \"npm run start:dev post-service\" \"npm run start:dev follow-service\" \"npm run start:dev notification-service\" \"npm run start:dev feed-service\""
+    "start:all": "concurrently -c \"auto\" -n \"GATEWAY,USER,POST,FOLLOW,NOTI,FEED,CHAT\" \"npm run start:dev social-backend\" \"npm run start:dev user-service\" \"npm run start:dev post-service\" \"npm run start:dev follow-service\" \"npm run start:dev notification-service\" \"npm run start:dev feed-service\" \"npm run start:dev chat-service\""
   },
   "dependencies": {
     "@grpc/grpc-js": "^1.14.3",
@@ -34,17 +34,19 @@
     "@nestjs/platform-socket.io": "^11.1.17",
     "@nestjs/swagger": "^11.2.6",
     "@nestjs/websockets": "^11.1.17",
+    "@socket.io/redis-adapter": "^8.3.0",
     "@types/mongodb": "^4.0.7",
     "amqp-connection-manager": "^5.0.0",
     "amqplib": "^0.10.9",
     "bcrypt": "^6.0.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.4",
-    "ioredis": "^5.10.0",
+    "ioredis": "^5.10.1",
     "kafkajs": "^2.2.4",
     "mongoose": "^9.2.3",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
+    "redis": "^5.11.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "socket.io": "^4.8.3"
@@ -61,6 +63,7 @@
     "@types/jest": "^30.0.0",
     "@types/node": "^22.10.7",
     "@types/passport-jwt": "^4.0.1",
+    "@types/redis": "^4.0.11",
     "@types/supertest": "^6.0.2",
     "concurrently": "^9.2.1",
     "eslint": "^9.18.0",

@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package chat;
+
+service ChatService{
+    rpc GetChatHistory (GetChatHistoryRequest) returns (ChatHistoryResponse) {}
+}
+
+message GetChatHistoryRequest {
+  string userId1 = 1;
+  string userId2 = 2;
+  int32 limit = 3;       // จำนวนข้อความที่ต้องการดึง (เช่น 20)
+  string cursor = 4;     // ID ของข้อความสุดท้ายที่โหลดไป เพื่อดึงชุดต่อไป (ส่งค่าว่างถ้าโหลดครั้งแรก)
+}
+
+message ChatMessage {
+  string id = 1;
+  string conversationId = 2; // รหัสห้องแชท
+  string senderId = 3;
+  string receiverId = 4;
+  string content = 5;
+  string createdAt = 6;
+  bool isRead = 7;
+}
+
+message ChatHistoryResponse {
+ repeated ChatMessage messages = 1;
+ string nextCursor = 2; // ส่งกลับไปให้ Client ใช้ในการดึงรอบถัดไป
+ bool hasMore = 3;      // บอก Client ว่ายังมีข้อความเก่ากว่านี้อีกไหม
+}

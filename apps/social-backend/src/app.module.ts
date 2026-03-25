@@ -3,11 +3,12 @@ import { AuthController } from './auth.controller';
 import { UsersController } from './users.controller';
 import { PostsController } from './posts.controller';
 import { FollowsController } from './follows.controller';
-import { AppService } from './app.service';
+import { ChatService } from './chat.service';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtStrategy } from './auth/jwt.strategy';
 import { join } from 'path';
+import { ChatController } from './chat.controller';
 
 @Module({
   imports: [
@@ -91,6 +92,19 @@ import { join } from 'path';
         }),
         inject: [ConfigService],
       },
+      {
+        name: 'CHAT_SERVICE',
+        imports: [ConfigModule],
+        useFactory: (configService: ConfigService) => ({
+          transport: Transport.GRPC,
+          options: {
+            package: 'chat',
+            protoPath: join(process.cwd(), 'libs/shared/src/proto/chat.proto'),
+            url: `${configService.get<string>('CHAT_SERVICE_HOST')}:${configService.get<number>('CHAT_SERVICE_PORT')}`,
+          },
+        }),
+        inject: [ConfigService],
+      },
     ]),
   ],
   controllers: [
@@ -98,7 +112,8 @@ import { join } from 'path';
     UsersController,
     PostsController,
     FollowsController,
+    ChatController,
   ],
-  providers: [AppService, JwtStrategy],
+  providers: [ChatService, JwtStrategy],
 })
 export class AppModule {}
