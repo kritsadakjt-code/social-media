@@ -4,3 +4,7 @@ export * from './dto/users/register.dto';
 export * from './dto/users/login.dto';
 export * from './dto/users/update-user.dto';
 export * from './dto/chat/get-chat-history.dto';
+export * from './interfaces/user.interface';
+export * from './interfaces/chat.interface';
+export * from './interfaces/follow.interface';
+export * from './interfaces/post.interface';

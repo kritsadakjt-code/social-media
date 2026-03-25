@@ -11,15 +11,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { UpdateUserDto } from '@app/shared';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { UsersService } from './users.service';
-
-// user.proto
-interface RequestWithUser extends Request {
-  user: {
-    userId: string;
-    username: string;
-    role: string;
-  };
-}
+import type { RequestWithUser } from './interfaces/request.interface';
 
 @ApiTags('Users')
 @Controller('users')

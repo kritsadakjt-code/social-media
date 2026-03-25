@@ -1,3 +1,4 @@
+// interface สําหรับวิ่งข้าม service อื่นๆ
 import { Observable } from 'rxjs';
 // interface ตาม proto
 
