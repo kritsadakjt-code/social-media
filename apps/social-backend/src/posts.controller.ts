@@ -7,15 +7,17 @@ import {
   Request,
   UseGuards,
 } from '@nestjs/common';
+
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CreatePostDto } from '@app/shared/dto/users/posts/create-post.dto';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { CreateCommentDto } from '@app/shared/dto/users/posts/create-comment.dto';
 import { PostsService } from './posts.service';
+import type { RequestWithUser } from './interfaces/request.interface';
 
-interface RequestWithUser extends Request {
-  user: { userId: string; username: string; role: string };
-}
+// interface RequestWithUser extends Request {
+//   user: { userId: string; username: string; role: string };
+// }
 
 @ApiTags('Posts')
 @Controller('posts')

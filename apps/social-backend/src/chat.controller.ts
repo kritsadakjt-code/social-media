@@ -12,10 +12,7 @@ import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { ChatService } from './chat.service';
 import { ChatHistoryQueryDto } from './dto/chat-history-query.dto';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-
-export interface RequestWithUser extends Request {
-  user: { userId: string };
-}
+import type { RequestWithUser } from './interfaces/request.interface';
 
 @ApiTags('Chat')
 @Controller('chat')

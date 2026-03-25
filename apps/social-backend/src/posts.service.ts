@@ -1,49 +1,11 @@
+import { PostGrpcService } from '@app/shared';
 import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import type {
   ClientGrpc,
   ClientKafka,
   ClientProxy,
 } from '@nestjs/microservices';
-import { firstValueFrom, Observable } from 'rxjs';
-
-export interface PostData {
-  id: string;
-  userId: string;
-  username: string;
-  content: string;
-  likes: number;
-  createdAt: string;
-}
-export interface PostListResponse {
-  posts: PostData[];
-}
-export interface CommentData {
-  id: string;
-  postId: string;
-  userId: string;
-  username: string;
-  content: string;
-  createdAt: string;
-}
-export interface CommentListResponse {
-  comments: CommentData[];
-}
-
-interface PostGrpcService {
-  getPosts(data: Record<string, never>): Observable<PostListResponse>;
-  getPostsByIds(data: { ids: string[] }): Observable<PostListResponse>;
-  getPostsByUserId(data: { userId: string }): Observable<PostListResponse>;
-  likePost(data: { postId: string; userId: string }): Observable<PostData>;
-  addComment(data: {
-    postId: string;
-    userId: string;
-    username: string;
-    content: string;
-  }): Observable<CommentData>;
-  getCommentsByPostId(data: {
-    postId: string;
-  }): Observable<CommentListResponse>;
-}
+import { firstValueFrom } from 'rxjs';
 
 @Injectable()
 export class PostsService implements OnModuleInit {

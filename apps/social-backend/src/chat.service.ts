@@ -5,10 +5,7 @@ import {
   InternalServerErrorException,
   OnModuleInit,
 } from '@nestjs/common';
-import {
-  ChatHistoryResponse,
-  ChatServiceClient,
-} from './interfaces/chat.interface';
+import { ChatHistoryResponse, ChatServiceClient } from '@app/shared';
 import { ChatHistoryQueryDto } from './dto/chat-history-query.dto';
 import { firstValueFrom } from 'rxjs';
 import type { ClientGrpc } from '@nestjs/microservices';
