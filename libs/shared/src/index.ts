@@ -8,3 +8,4 @@ export * from './interfaces/user.interface';
 export * from './interfaces/chat.interface';
 export * from './interfaces/follow.interface';
 export * from './interfaces/post.interface';
+export * from './guards/ws-jwt.guard';

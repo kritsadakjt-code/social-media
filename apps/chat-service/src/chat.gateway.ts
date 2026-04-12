@@ -6,10 +6,14 @@ import {
   OnGatewayDisconnect,
   ConnectedSocket,
   MessageBody,
+  OnGatewayInit,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { Logger } from '@nestjs/common';
+import { Logger, UseGuards } from '@nestjs/common';
 import { ChatService, ChatMessageResponse } from './chat-service.service';
+import { WsJwtGuard } from '@app/shared';
+import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 
 // client ส่งมา
 export interface SendMessagePayload {
@@ -17,9 +21,19 @@ export interface SendMessagePayload {
   content: string;
 }
 
+interface WsJwtPayload {
+  sub: string;
+  username: string;
+  role: string;
+  iat?: number;
+  exp?: number;
+}
+
 // โครงสร้างที่จะเก็บข้อมูลใน session
 export interface ClientSocketData {
   userId: string;
+  username: string;
+  role: string;
 }
 
 // โครงสร้างสำหรับ Handshake Query และ Auth
@@ -46,18 +60,59 @@ export type AuthenticatedSocket = Socket<
   },
   namespace: '/chat',
 })
-export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class ChatGateway
+  implements OnGatewayConnection, OnGatewayDisconnect, OnGatewayInit
+{
   @WebSocketServer()
   private readonly server!: Server;
 
   private readonly logger = new Logger(ChatGateway.name);
 
-  constructor(private readonly chatService: ChatService) {}
+  constructor(
+    private readonly chatService: ChatService,
+    private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
+  ) {}
+
+  // สร้าง middleware เช็ค token ก่อนเชื่อมต่อ
+  afterInit(server: Server) {
+    server.use((socket: AuthenticatedSocket, next) => {
+      const auth = socket.handshake.auth as Record<string, unknown>;
+      const headers = socket.handshake.headers as Record<string, unknown>;
+
+      let token: string | undefined;
+
+      if (typeof auth?.token === 'string') {
+        token = auth.token;
+      } else if (typeof headers?.authorization === 'string') {
+        token = headers.authorization.split(' ')[1];
+      }
+
+      if (!token) {
+        return next(new Error('Unauthorized: Missing token'));
+      }
+
+      this.jwtService
+        .verifyAsync<WsJwtPayload>(token, {
+          secret: this.configService.get<string>('JWT_SECRET'),
+        })
+        .then((payload) => {
+          socket.data = {
+            userId: payload.sub,
+            username: payload.username,
+            role: payload.role,
+          };
+          next();
+        })
+        .catch(() => {
+          next(new Error('Unauthorized: Invalid token'));
+        });
+    });
+  }
 
   async handleConnection(client: AuthenticatedSocket): Promise<void> {
     try {
-      const query = client.handshake.query as HandshakeQuery; //ดึงข้อมูลที่ client ส่งมา
-      const userId = query.userId;
+      const userId = client.data.userId;
 
       if (!userId) {
         this.logger.warn(
@@ -67,9 +122,6 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         return;
       }
 
-      // ฝัง userId ลงใน Session
-      client.data = { userId };
-
       const userRoom = `user_${userId}`;
       // ใช้เพื่อให้ user มีที่อยู่เเน่นอนในการส่งข้อความเพราะ socket.id เปลี่ยนเเปลงตลอดที่ refresh หน้า
       await client.join(userRoom);
@@ -77,6 +129,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.logger.log(
         `✅ Client Connected: ${client.id} | User ID: ${userId} joined ${userRoom}`,
       );
+      this.logger.log(`✅ Secure Connection: User ${userId}`);
     } catch (error) {
       const err = error as Error;
       this.logger.error(`Connection Error: ${err.message}`);
@@ -91,6 +144,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     );
   }
 
+  @UseGuards(WsJwtGuard) // จะทํางานเฉพาะ event ที่มีการ SubscribeMessage
   @SubscribeMessage('send_message')
   async handleSendMessage(
     @ConnectedSocket() client: AuthenticatedSocket,
