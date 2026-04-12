@@ -40,12 +40,13 @@
     <div id="alerts">รอรับการแจ้งเตือน...</div>
 
     <script>
-      //  User ID ของคนที่จะโดนกดไลก์โพสต์
-      const MY_USER_ID = '69ae3e2f9aa69fb3f7210844';
-
       // เชื่อมต่อไปที่ Notification Service (พอร์ต 3004)
-      const socket = io('http://localhost:3004', {
-        query: { userId: MY_USER_ID },
+      const socket = io('http://localhost:3004/notification', {
+        auth: {
+          //  token ของคนที่จะโดนกดไลก์โพสต์
+          token:
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2OWFlM2UyZjlhYTY5ZmIzZjcyMTA4NDQiLCJ1c2VybmFtZSI6InRhciIsInJvbGUiOiJ1c2VyIiwiaWF0IjoxNzc1ODk5MTcxLCJleHAiOjE3NzU5MDI3NzF9.hSvVCCLt_DdHFBOm_iYcA9qrUgF3xoZvlo9iHwdAbZQ',
+        },
       });
 
       socket.on('connect', () => {

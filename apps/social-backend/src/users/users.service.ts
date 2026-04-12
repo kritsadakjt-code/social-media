@@ -1,8 +1,7 @@
 import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import type { ClientGrpc } from '@nestjs/microservices';
-import { UpdateUserDto } from '@app/shared';
+import { UpdateUserDto, UserResponse } from '@app/shared';
 import { Observable } from 'rxjs';
-import { UserResponse } from '../auth/auth.service';
 
 interface UserGrpcService {
   getUser(data: { id: string }): Observable<UserResponse>;

@@ -5,6 +5,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Message, MessageSchema } from './message.schema';
 import { ChatGateway } from './chat.gateway';
+import { JwtModule } from '@nestjs/jwt';
 
 @Module({
   imports: [
@@ -19,6 +20,14 @@ import { ChatGateway } from './chat.gateway';
     }),
 
     MongooseModule.forFeature([{ name: Message.name, schema: MessageSchema }]),
+
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      useFactory: (configService: ConfigService) => ({
+        secret: configService.get<string>('JWT_SECRET'),
+      }),
+      inject: [ConfigService],
+    }),
   ],
   controllers: [ChatServiceController],
   providers: [ChatService, ChatGateway],
