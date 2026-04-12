@@ -6,10 +6,19 @@ import { UsersModule } from './users/users.module';
 import { PostsModule } from './posts/posts.module';
 import { FollowsModule } from './follows/follows.module';
 import { ChatModule } from './chat/chat.module';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60000,
+        limit: 100,
+      },
+    ]),
+
     AuthModule,
     UsersModule,
     PostsModule,
@@ -17,6 +26,12 @@ import { ChatModule } from './chat/chat.module';
     ChatModule,
   ],
   controllers: [],
-  providers: [],
+  providers: [
+    // ให้ครอบคลุมทุก api
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+  ],
 })
 export class AppModule {}
