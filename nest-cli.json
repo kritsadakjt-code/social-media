@@ -3,7 +3,9 @@
   "collection": "@nestjs/schematics",
   "sourceRoot": "apps/social-backend/src",
   "compilerOptions": {
-    "assets": ["**/*.proto"],
+    "assets": [
+      "**/*.proto"
+    ],
     "watchAssets": true,
     "deleteOutDir": true,
     "webpack": true,
@@ -12,6 +14,15 @@
   "monorepo": true,
   "root": "apps/social-backend",
   "projects": {
+    "chat-service": {
+      "type": "application",
+      "root": "apps/chat-service",
+      "entryFile": "main",
+      "sourceRoot": "apps/chat-service/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/chat-service/tsconfig.app.json"
+      }
+    },
     "feed-service": {
       "type": "application",
       "root": "apps/feed-service",

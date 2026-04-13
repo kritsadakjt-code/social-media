@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Chat Tester</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  </head>
+  <body style="font-family: Arial; padding: 20px">
+    <h2>Chat Service Tester 🚀</h2>
+
+    <label>JWT Token ของคุณ:</label><br />
+    <input
+      type="text"
+      id="tokenInput"
+      placeholder="eyJhbG..."
+      style="width: 100%"
+    /><br /><br />
+
+    <button onclick="connectChat()">1. เชื่อมต่อแชท (Connect)</button>
+    <p id="status">สถานะ: ยังไม่ได้เชื่อมต่อ 🔴</p>
+
+    <hr />
+
+    <h3>ส่งข้อความ</h3>
+    <input
+      type="text"
+      id="receiverId"
+      placeholder="User ID ผู้รับ"
+    /><br /><br />
+    <input type="text" id="message" placeholder="พิมพ์ข้อความ..." /><br /><br />
+    <button onclick="sendMessage()">2. ส่งข้อความ (Send)</button>
+
+    <hr />
+
+    <h3>กล่องข้อความ (Inbox)</h3>
+    <ul id="messages"></ul>
+
+    <script>
+      let socket;
+
+      function connectChat() {
+        const token = document.getElementById('tokenInput').value;
+
+        // 🌟 1. เชื่อมต่อไปที่ Chat Service + Namespace /chat พร้อมแนบ Token
+        socket = io('http://localhost:3005/chat', {
+          auth: { token: token },
+        });
+
+        // ตรวจจับเมื่อเชื่อมต่อสำเร็จ
+        socket.on('connect', () => {
+          document.getElementById('status').innerText =
+            'สถานะ: เชื่อมต่อสำเร็จแล้ว 🟢 (Socket ID: ' + socket.id + ')';
+        });
+
+        // ตรวจจับเมื่อ Token ผิดหรือมี Error จาก Guard
+        socket.on('connect_error', (err) => {
+          document.getElementById('status').innerText =
+            'สถานะ: เชื่อมต่อล้มเหลว 🔴 (' + err.message + ')';
+        });
+
+        // 🌟 2. รอรับข้อความ (Listen)
+        socket.on('receive_message', (data) => {
+          const li = document.createElement('li');
+          li.innerHTML = `<b>จาก: ${data.senderId}</b> <br> ข้อความ: ${data.content} <br><small>${data.createdAt}</small>`;
+          document.getElementById('messages').appendChild(li);
+        });
+      }
+
+      function sendMessage() {
+        if (!socket || !socket.connected) return alert('กรุณาเชื่อมต่อก่อน!');
+
+        const receiverId = document.getElementById('receiverId').value;
+        const content = document.getElementById('message').value;
+
+        // 🌟 3. ส่งข้อความไปที่ Server (Emit)
+        socket.emit(
+          'send_message',
+          {
+            receiverId: receiverId,
+            content: content,
+          },
+          (response) => {
+            // อันนี้คือ Acknowledgement callback (ถ้ามี)
+            console.log('Server response:', response);
+          },
+        );
+
+        document.getElementById('message').value = ''; // เคลียร์ช่องพิมพ์
+      }
+    </script>
+  </body>
+</html>
