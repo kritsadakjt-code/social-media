@@ -5,6 +5,8 @@ import { ClientKafka, RpcException } from '@nestjs/microservices';
 import { MongoError } from 'mongodb';
 import { status } from '@grpc/grpc-js';
 import { Inject, Injectable } from '@nestjs/common';
+import { registry, UnfollowedSchema } from '@app/shared';
+import { SchemaType } from '@kafkajs/confluent-schema-registry';
 
 @Injectable()
 export class FollowService {
@@ -69,10 +71,26 @@ export class FollowService {
       });
     }
 
-    this.kafkaClient.emit('unfollowed', {
+    const rawData = {
       followerId: data.followerId,
       followingId: data.followingId,
-    });
+    };
+    try {
+      const { id } = await registry.register({
+        type: SchemaType.AVRO,
+        schema: JSON.stringify(UnfollowedSchema),
+      });
+      const encodedPayload = await registry.encode(id, rawData);
+      this.kafkaClient.emit('unfollowed', {
+        encodedPayload,
+      });
+      console.log(`✅ ส่งข้อความผ่าน Unfollowed Registry สำเร็จ! `);
+    } catch (error) {
+      console.log(
+        '❌ ไม่สามารถส่งข้อความผ่าน Unfollowed Schema Registry ได้:',
+        error,
+      );
+    }
 
     return { success: true, message: 'เลิกติดตามเรียบร้อยแล้ว' };
   }

@@ -1,3 +1,4 @@
+import { registry } from '@app/shared';
 import { Controller, Inject, OnModuleInit } from '@nestjs/common';
 import {
   ClientKafka,
@@ -36,16 +37,37 @@ export class FeedServiceController implements OnModuleInit {
   @EventPattern('post_created')
   async handlePostCreated(
     @Payload()
-    message: {
+    encodedMessage: Buffer | { value: Buffer | string },
+  ) {
+    let message: {
       postId: string;
       authorId: string;
       content: string;
       timestamp: string;
-    },
-  ) {
+      // imageUrl: string | null;
+    };
+
+    try {
+      let bufferData: Buffer;
+      if (Buffer.isBuffer(encodedMessage)) {
+        bufferData = encodedMessage;
+      } else {
+        bufferData = Buffer.from(encodedMessage.value || '');
+      }
+      message = (await registry.decode(bufferData)) as typeof message;
+    } catch (error) {
+      console.error(
+        '❌ ข้อมูลผิดโครงสร้าง (ทิ้งข้อความ)!:',
+        (error as Error).message,
+      );
+      return;
+    }
     console.log(
-      `\n📢 [FEED SERVICE] ได้รับโพสต์ใหม่จาก User ID: ${message.authorId}`,
+      `\n📢 [FEED SERVICE] ได้รับโพสต์ใหม่ (ถอดรหัสสำเร็จ) จาก: ${message.authorId}`,
     );
+    // console.log(
+    //   `รูปภาพที่แนบมา: ${message.imageUrl ? message.imageUrl : 'ไม่มีรูปภาพ'}`,
+    // );
 
     console.log(`กำลังขอรายชื่อผู้ติดตามของ ${message.authorId}...`);
     const followers: string[] = await firstValueFrom(
@@ -89,11 +111,29 @@ export class FeedServiceController implements OnModuleInit {
     return postIds;
   }
 
-  // 🌟 2. ดักฟัง Event เลิกติดตาม
   @EventPattern('unfollowed')
   async handleUnfollowed(
-    @Payload() message: { followerId: string; followingId: string },
+    // อาจเป็น string ได้ถ้าส่งมาตรงๆ เเบบยังไม่ใช้ schema registry
+    @Payload() encodedMessage: Buffer | { value: Buffer | string },
   ) {
+    let message: { followerId: string; followingId: string };
+
+    try {
+      let bufferData: Buffer;
+      if (Buffer.isBuffer(encodedMessage)) {
+        bufferData = encodedMessage;
+      } else {
+        // .from เเปลงเป็น buffer ถ้าส่งมาเป็น object หรือ string
+        bufferData = Buffer.from(encodedMessage.value || '');
+      }
+      message = (await registry.decode(bufferData)) as typeof message;
+    } catch (error) {
+      console.error(
+        '❌ ข้อมูลผิดโครงสร้าง (ทิ้งข้อความ)!:',
+        (error as Error).message,
+      );
+      return;
+    }
     console.log(
       `\n🧹 [FEED CLEANUP] User ${message.followerId} เลิกติดตาม ${message.followingId}`,
     );

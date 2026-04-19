@@ -5,6 +5,8 @@ import { Model } from 'mongoose';
 import { ClientKafka, RpcException } from '@nestjs/microservices';
 import { status } from '@grpc/grpc-js';
 import { Comment, CommentDocument } from './comment.schema';
+import { PostCreatedSchema, PostLikedSchema, registry } from '@app/shared';
+import { SchemaType } from '@kafkajs/confluent-schema-registry';
 
 @Injectable()
 export class PostService implements OnModuleInit {
@@ -30,12 +32,29 @@ export class PostService implements OnModuleInit {
     });
 
     const savedPost = await newPost.save();
-    this.kafkaClient.emit('post_created', {
+
+    const rawData = {
       postId: savedPost._id.toString(),
       authorId: savedPost.userId,
       content: savedPost.content,
-      timestamp: savedPost.createdAt || new Date().toISOString(),
-    });
+      timestamp: savedPost.createdAt
+        ? new Date(savedPost.createdAt).toISOString()
+        : new Date().toISOString(),
+      // imageUrl: 'https://example.com/my-awesome-photo.jpg',
+      // imageUrl2: 'https://example.com/my-awesome-photo2.jpg',
+    };
+
+    try {
+      const { id } = await registry.register({
+        type: SchemaType.AVRO,
+        schema: JSON.stringify(PostCreatedSchema),
+      });
+      const encodedPayload = await registry.encode(id, rawData);
+      this.kafkaClient.emit('post_created', encodedPayload);
+      console.log(`✅ ส่งข้อความ Post Created ผ่าน Schema Registry สำเร็จ!`);
+    } catch (error) {
+      console.error('❌ ไม่สามารถส่งข้อความ post_created ได้:', error);
+    }
 
     console.log(`บันทึกโพสต์สำเร็จ (ID: ${savedPost._id.toString()})`);
     return savedPost;
@@ -112,12 +131,24 @@ export class PostService implements OnModuleInit {
       });
     }
 
-    this.kafkaClient.emit('post_liked', {
+    const rawData = {
       postId: updatedPost._id.toString(),
       postOwnerId: updatedPost.userId, // เจ้าของโพสต์ (คนที่จะโดนแจ้งเตือน)
       likedByUserId: userId, // คนที่ไปกดไลก์
       timestamp: new Date().toISOString(),
-    });
+    };
+    try {
+      const { id } = await registry.register({
+        type: SchemaType.AVRO,
+        schema: JSON.stringify(PostLikedSchema),
+      });
+
+      const encodedPayload = await registry.encode(id, rawData);
+      this.kafkaClient.emit('post_liked', { encodedPayload });
+      console.log(`✅ ส่งข้อความ Post Liked ผ่าน Schema Registry สำเร็จ!`);
+    } catch (error) {
+      console.error('❌ ไม่สามารถส่งข้อความ post_liked ได้:', error);
+    }
 
     return {
       id: updatedPost._id.toString(),
