@@ -1,7 +1,10 @@
+import { registry } from '@app/shared';
 import { Controller, Inject, OnModuleInit } from '@nestjs/common';
 import {
   ClientKafka,
+  Ctx,
   EventPattern,
+  KafkaContext,
   MessagePattern,
   Payload,
 } from '@nestjs/microservices';
@@ -20,6 +23,14 @@ interface PostItem {
 interface UserPostsResponse {
   posts: PostItem[];
 }
+
+export interface PostCreatedEventPayload {
+  postId: string;
+  authorId: string;
+  content: string;
+  timestamp: string;
+  // imageUrl: string | null;
+}
 @Controller()
 export class FeedServiceController implements OnModuleInit {
   constructor(
@@ -33,19 +44,40 @@ export class FeedServiceController implements OnModuleInit {
     await this.kafkaClient.connect();
   }
 
-  @EventPattern('post_created')
+  @EventPattern('post_events')
   async handlePostCreated(
     @Payload()
-    message: {
-      postId: string;
-      authorId: string;
-      content: string;
-      timestamp: string;
-    },
+    encodedMessage: Buffer | { value: Buffer | string },
+    @Ctx() context: KafkaContext,
   ) {
+    const originalMessage = context.getMessage();
+
+    const eventType = originalMessage.headers?.['event_type']?.toString();
+
+    if (!eventType) {
+      console.log('หยุดทํางานไม่ใช่ post_created');
+      return;
+    }
+    let message: PostCreatedEventPayload;
+
+    try {
+      const bufferData = Buffer.isBuffer(encodedMessage)
+        ? encodedMessage
+        : Buffer.from(encodedMessage.value || '');
+      message = (await registry.decode(bufferData)) as PostCreatedEventPayload;
+    } catch (error) {
+      console.error(
+        '❌ ข้อมูลผิดโครงสร้าง (ทิ้งข้อความ)!:',
+        (error as Error).message,
+      );
+      return;
+    }
     console.log(
-      `\n📢 [FEED SERVICE] ได้รับโพสต์ใหม่จาก User ID: ${message.authorId}`,
+      `\n📢 [FEED SERVICE] ได้รับโพสต์ใหม่ (ถอดรหัสสำเร็จ) จาก: ${message.authorId}`,
     );
+    // console.log(
+    //   `รูปภาพที่แนบมา: ${message.imageUrl ? message.imageUrl : 'ไม่มีรูปภาพ'}`,
+    // );
 
     console.log(`กำลังขอรายชื่อผู้ติดตามของ ${message.authorId}...`);
     const followers: string[] = await firstValueFrom(
@@ -89,11 +121,29 @@ export class FeedServiceController implements OnModuleInit {
     return postIds;
   }
 
-  // 🌟 2. ดักฟัง Event เลิกติดตาม
   @EventPattern('unfollowed')
   async handleUnfollowed(
-    @Payload() message: { followerId: string; followingId: string },
+    // อาจเป็น string ได้ถ้าส่งมาตรงๆ เเบบยังไม่ใช้ schema registry
+    @Payload() encodedMessage: Buffer | { value: Buffer | string },
   ) {
+    let message: { followerId: string; followingId: string };
+
+    try {
+      let bufferData: Buffer;
+      if (Buffer.isBuffer(encodedMessage)) {
+        bufferData = encodedMessage;
+      } else {
+        // .from เเปลงเป็น buffer ถ้าส่งมาเป็น object หรือ string
+        bufferData = Buffer.from(encodedMessage.value || '');
+      }
+      message = (await registry.decode(bufferData)) as typeof message;
+    } catch (error) {
+      console.error(
+        '❌ ข้อมูลผิดโครงสร้าง (ทิ้งข้อความ)!:',
+        (error as Error).message,
+      );
+      return;
+    }
     console.log(
       `\n🧹 [FEED CLEANUP] User ${message.followerId} เลิกติดตาม ${message.followingId}`,
     );

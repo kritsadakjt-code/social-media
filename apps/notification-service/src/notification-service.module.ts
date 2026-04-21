@@ -4,6 +4,8 @@ import { NotificationService } from './notification-service.service';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { NotificationGateway } from './notification.gateway';
 import { JwtModule } from '@nestjs/jwt';
+import { EventEmitterModule } from '@nestjs/event-emitter';
+import { PostLikedHandler } from './handlers/posts/post-liked.handler';
 
 @Module({
   imports: [
@@ -16,8 +18,10 @@ import { JwtModule } from '@nestjs/jwt';
       }),
       inject: [ConfigService],
     }),
+
+    EventEmitterModule.forRoot(),
   ],
   controllers: [NotificationServiceController],
-  providers: [NotificationService, NotificationGateway],
+  providers: [NotificationService, NotificationGateway, PostLikedHandler],
 })
 export class NotificationServiceModule {}
