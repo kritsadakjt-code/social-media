@@ -9,6 +9,5 @@ export const PostCreatedSchema = {
     { name: 'content', type: 'string' },
     { name: 'timestamp', type: 'string' },
     { name: 'imageUrl', type: ['null', 'string'], default: null },
-    // { name: 'imageUrl2', type: ['null', 'string'], default: null },
   ],
 };

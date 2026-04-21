@@ -10,6 +10,8 @@ import { SchemaType } from '@kafkajs/confluent-schema-registry';
 
 @Injectable()
 export class FollowService {
+  private unfollowedSchemaId!: number;
+
   constructor(
     @InjectModel(Follow.name) private followModel: Model<Follow>,
     @Inject('KAFKA_SERVICE') private readonly kafkaClient: ClientKafka,
@@ -17,6 +19,13 @@ export class FollowService {
 
   async onModuleInit() {
     await this.kafkaClient.connect();
+
+    const unfollowed = await registry.register({
+      type: SchemaType.AVRO,
+      schema: JSON.stringify(UnfollowedSchema),
+    });
+
+    this.unfollowedSchemaId = unfollowed.id;
   }
   // func follow
   async followUser(data: { followerId: string; followingId: string }) {
@@ -76,11 +85,10 @@ export class FollowService {
       followingId: data.followingId,
     };
     try {
-      const { id } = await registry.register({
-        type: SchemaType.AVRO,
-        schema: JSON.stringify(UnfollowedSchema),
-      });
-      const encodedPayload = await registry.encode(id, rawData);
+      const encodedPayload = await registry.encode(
+        this.unfollowedSchemaId,
+        rawData,
+      );
       this.kafkaClient.emit('unfollowed', {
         encodedPayload,
       });

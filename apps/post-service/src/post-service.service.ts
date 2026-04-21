@@ -10,6 +10,9 @@ import { SchemaType } from '@kafkajs/confluent-schema-registry';
 
 @Injectable()
 export class PostService implements OnModuleInit {
+  private postCreatedSchemaId!: number;
+  private postLikedSchemaId!: number;
+
   constructor(
     @InjectModel(Post.name) private postModel: Model<Post>,
     @InjectModel(Comment.name) private commentModel: Model<CommentDocument>,
@@ -18,6 +21,25 @@ export class PostService implements OnModuleInit {
 
   async onModuleInit() {
     await this.kafkaClient.connect();
+
+    // ไปขอ schemaID เเค่ครั้งเดียวเเละจําไปตลอด ตอน start service เเก้จากที่ต้องยิงเข้ามาทีละครั้ง
+    try {
+      const postCreated = await registry.register({
+        type: SchemaType.AVRO,
+        schema: JSON.stringify(PostCreatedSchema),
+      });
+      this.postCreatedSchemaId = postCreated.id;
+
+      const postLiked = await registry.register({
+        type: SchemaType.AVRO,
+        schema: JSON.stringify(PostLikedSchema),
+      });
+      this.postLikedSchemaId = postLiked.id;
+
+      console.log('✅ โหลด Schema ลง Memory สำเร็จ!');
+    } catch (error) {
+      console.error('❌ โหลด Schema ไม่สำเร็จ:', error);
+    }
   }
 
   async createPost(data: {
@@ -45,12 +67,17 @@ export class PostService implements OnModuleInit {
     };
 
     try {
-      const { id } = await registry.register({
-        type: SchemaType.AVRO,
-        schema: JSON.stringify(PostCreatedSchema),
+      const encodedPayload = await registry.encode(
+        this.postCreatedSchemaId,
+        rawData,
+      );
+      this.kafkaClient.emit('post_events', {
+        key: savedPost._id.toString(),
+        value: encodedPayload,
+        headers: {
+          event_type: 'post_created',
+        },
       });
-      const encodedPayload = await registry.encode(id, rawData);
-      this.kafkaClient.emit('post_created', encodedPayload);
       console.log(`✅ ส่งข้อความ Post Created ผ่าน Schema Registry สำเร็จ!`);
     } catch (error) {
       console.error('❌ ไม่สามารถส่งข้อความ post_created ได้:', error);
@@ -138,13 +165,17 @@ export class PostService implements OnModuleInit {
       timestamp: new Date().toISOString(),
     };
     try {
-      const { id } = await registry.register({
-        type: SchemaType.AVRO,
-        schema: JSON.stringify(PostLikedSchema),
+      const encodedPayload = await registry.encode(
+        this.postLikedSchemaId,
+        rawData,
+      );
+      this.kafkaClient.emit('post_events', {
+        key: postId,
+        value: encodedPayload,
+        headers: {
+          event_type: 'post_liked',
+        },
       });
-
-      const encodedPayload = await registry.encode(id, rawData);
-      this.kafkaClient.emit('post_liked', { encodedPayload });
       console.log(`✅ ส่งข้อความ Post Liked ผ่าน Schema Registry สำเร็จ!`);
     } catch (error) {
       console.error('❌ ไม่สามารถส่งข้อความ post_liked ได้:', error);

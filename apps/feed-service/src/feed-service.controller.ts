@@ -2,7 +2,9 @@ import { registry } from '@app/shared';
 import { Controller, Inject, OnModuleInit } from '@nestjs/common';
 import {
   ClientKafka,
+  Ctx,
   EventPattern,
+  KafkaContext,
   MessagePattern,
   Payload,
 } from '@nestjs/microservices';
@@ -21,6 +23,14 @@ interface PostItem {
 interface UserPostsResponse {
   posts: PostItem[];
 }
+
+export interface PostCreatedEventPayload {
+  postId: string;
+  authorId: string;
+  content: string;
+  timestamp: string;
+  // imageUrl: string | null;
+}
 @Controller()
 export class FeedServiceController implements OnModuleInit {
   constructor(
@@ -34,27 +44,27 @@ export class FeedServiceController implements OnModuleInit {
     await this.kafkaClient.connect();
   }
 
-  @EventPattern('post_created')
+  @EventPattern('post_events')
   async handlePostCreated(
     @Payload()
     encodedMessage: Buffer | { value: Buffer | string },
+    @Ctx() context: KafkaContext,
   ) {
-    let message: {
-      postId: string;
-      authorId: string;
-      content: string;
-      timestamp: string;
-      // imageUrl: string | null;
-    };
+    const originalMessage = context.getMessage();
+
+    const eventType = originalMessage.headers?.['event_type']?.toString();
+
+    if (!eventType) {
+      console.log('หยุดทํางานไม่ใช่ post_created');
+      return;
+    }
+    let message: PostCreatedEventPayload;
 
     try {
-      let bufferData: Buffer;
-      if (Buffer.isBuffer(encodedMessage)) {
-        bufferData = encodedMessage;
-      } else {
-        bufferData = Buffer.from(encodedMessage.value || '');
-      }
-      message = (await registry.decode(bufferData)) as typeof message;
+      const bufferData = Buffer.isBuffer(encodedMessage)
+        ? encodedMessage
+        : Buffer.from(encodedMessage.value || '');
+      message = (await registry.decode(bufferData)) as PostCreatedEventPayload;
     } catch (error) {
       console.error(
         '❌ ข้อมูลผิดโครงสร้าง (ทิ้งข้อความ)!:',
