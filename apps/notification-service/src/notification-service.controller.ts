@@ -1,20 +1,29 @@
 import { Controller } from '@nestjs/common';
-import { NotificationService } from './notification-service.service';
+// import { NotificationService } from './notification-service.service';
 import {
   Ctx,
   EventPattern,
   KafkaContext,
   Payload,
 } from '@nestjs/microservices';
-import { NotificationGateway } from './notification.gateway';
-import { EventEmitter2 } from '@nestjs/event-emitter';
+// import { NotificationGateway } from './notification.gateway';
+// import { EventEmitter2 } from '@nestjs/event-emitter';
+// import { registry } from '@app/shared';
 import { registry } from '@app/shared';
+import { EventBus } from '@nestjs/cqrs';
+import {
+  createNotificationEvent,
+  isKnowNotificationEvent,
+  NotificationEventRegistry,
+} from './events-mappers/posts/post-event.mapper';
+
 @Controller()
 export class NotificationServiceController {
   constructor(
-    private readonly notificationService: NotificationService,
-    private readonly notificationGateway: NotificationGateway,
-    private eventEmitter: EventEmitter2,
+    // private readonly notificationService: NotificationService,
+    // private readonly notificationGateway: NotificationGateway,
+    // private eventEmitter: EventEmitter2,
+    private readonly eventBus: EventBus,
   ) {}
 
   // รอฟัง event follow_created
@@ -43,18 +52,37 @@ export class NotificationServiceController {
     const originalMessage = context.getMessage();
     const eventType = originalMessage.headers?.['event_type']?.toString();
 
+    if (!eventType) {
+      console.warn('⚠️ ได้รับข้อความที่ไม่มี Header: event_type');
+      return;
+    }
+
+    // check ว่ามี event ที่ระบบรู้จักมั้ย
+    if (!isKnowNotificationEvent(eventType)) {
+      console.log(`[NOTI] ข้าม Event: ${eventType} (ยังไม่รองรับ)`);
+      return;
+    }
     const bufferData = Buffer.isBuffer(encodedMessage)
       ? encodedMessage
       : Buffer.from(encodedMessage.value || '');
-    const decodedData = (await registry.decode(bufferData)) as Record<
-      string,
-      unknown
-    >;
+    const decodedData = (await registry.decode(
+      bufferData,
+    )) as NotificationEventRegistry[typeof eventType];
+    // as Record<
+    //   string,
+    //   unknown
+    // >;
 
-    if (!eventType) return;
+    console.log(`📥 รับ Event: post_liked กำลังกระจายเข้าสู่ CQRS EventBus`);
+    const eventInstance = createNotificationEvent(eventType, decodedData);
 
-    console.log(`รับ Event: ${eventType} แล้วส่งต่อให้ภายในจัดการ`);
-    this.eventEmitter.emit(`notification.${eventType}`, decodedData);
+    console.log(eventInstance);
+    this.eventBus.publish(eventInstance);
+
+    // if (!eventType) return;
+
+    // console.log(`รับ Event: ${eventType} แล้วส่งต่อให้ภายในจัดการ`);
+    // this.eventEmitter.emit(`notification.${eventType}`, decodedData);
   }
 
   // @EventPattern('post_liked')
