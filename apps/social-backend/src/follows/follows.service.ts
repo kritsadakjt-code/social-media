@@ -1,4 +1,4 @@
-import { FollowGrpcService } from '@app/shared/interfaces/follow.interface';
+import { FollowGrpcService } from '@app/shared/interfaces-photo/follow.interface';
 import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import type { ClientGrpc } from '@nestjs/microservices';
 

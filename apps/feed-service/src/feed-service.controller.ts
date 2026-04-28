@@ -54,7 +54,7 @@ export class FeedServiceController implements OnModuleInit {
 
     const eventType = originalMessage.headers?.['event_type']?.toString();
 
-    if (!eventType) {
+    if (eventType != 'post_created') {
       console.log('หยุดทํางานไม่ใช่ post_created');
       return;
     }
@@ -101,7 +101,6 @@ export class FeedServiceController implements OnModuleInit {
       // zadd ยัดลง Sorted Set โดยใช้ score (เวลา) เป็นตัวเรียงลำดับ
       pipeline.zadd(`feed:${followerId}`, score, message.postId);
 
-      // เก็บ 500 post เพื่อไม่ให้ ram เต็ม
       pipeline.zremrangebyrank(`feed:${followerId}`, 0, -21);
       // หมดอายุ 7 วัน กันกรณีที่โพสต์ไม่เต็มจะค้างอยู่ที่ redis
       pipeline.expire(`feed:${followerId}`, 604800);
