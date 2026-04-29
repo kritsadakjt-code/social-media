@@ -1,5 +1,5 @@
 import { SchemaRegistry } from '@kafkajs/confluent-schema-registry';
 
 export const registry = new SchemaRegistry({
-  host: 'http://localhost:8081',
+  host: process.env.SCHEMA_REGISTRY_URL || 'http://localhost:8081',
 });

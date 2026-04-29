@@ -4,7 +4,7 @@ import type { ClientGrpc } from '@nestjs/microservices';
 
 @Injectable()
 export class FollowsService implements OnModuleInit {
-  private followGrpcService: FollowGrpcService;
+  private followGrpcService!: FollowGrpcService;
   constructor(
     @Inject('FOLLOW_SERVICE') private readonly followClient: ClientGrpc,
   ) {}

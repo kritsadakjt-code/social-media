@@ -261,13 +261,13 @@ export class PostService implements OnModuleInit {
   }
 
   async getCommentsByPostId(postId: string) {
-    const comment = await this.commentModel
+    const comments = await this.commentModel
       .find({ postId: postId })
       .sort({ createdAt: 1 })
       .exec();
 
     return {
-      comment: comment.map((c) => ({
+      comments: comments.map((c) => ({
         id: c._id.toString(),
         postId: c.postId,
         userId: c.userId,

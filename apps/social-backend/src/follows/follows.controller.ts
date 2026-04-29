@@ -15,7 +15,7 @@ import { FollowsService } from './follows.service';
 @ApiTags('Follows')
 @Controller('follows')
 export class FollowsController {
-  private readonly followService: FollowsService;
+  constructor(private readonly followService: FollowsService) {}
 
   @Post(':id')
   @ApiBearerAuth()

@@ -29,7 +29,7 @@ export class PostsController {
     @Request() req: RequestWithUser,
     @Body() createPostDto: CreatePostDto,
   ) {
-    this.postsService.createPost(
+    return this.postsService.createPost(
       req.user.userId,
       req.user.username,
       createPostDto.content,

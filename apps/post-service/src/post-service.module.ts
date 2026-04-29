@@ -14,7 +14,7 @@ import { Comment, CommentSchema } from './comment.schema';
     MongooseModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
-        uri: configService.get<string>('POST_MONGO_URI'),
+        uri: configService.getOrThrow<string>('POST_MONGO_URI'),
       }),
       inject: [ConfigService],
     }),
