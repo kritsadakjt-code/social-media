@@ -7,6 +7,7 @@ import { JwtModule } from '@nestjs/jwt';
 // import { EventEmitterModule } from '@nestjs/event-emitter';
 import { PostLikedHandler } from './handlers/posts/post-liked.handler';
 import { CqrsModule } from '@nestjs/cqrs';
+import { PostCommentHandler } from './handlers/posts/post-comment.handler';
 
 @Module({
   imports: [
@@ -24,6 +25,11 @@ import { CqrsModule } from '@nestjs/cqrs';
     CqrsModule,
   ],
   controllers: [NotificationServiceController],
-  providers: [NotificationService, NotificationGateway, PostLikedHandler],
+  providers: [
+    NotificationService,
+    NotificationGateway,
+    PostLikedHandler,
+    PostCommentHandler,
+  ],
 })
 export class NotificationServiceModule {}
