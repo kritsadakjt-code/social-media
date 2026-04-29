@@ -9,7 +9,7 @@ import { firstValueFrom } from 'rxjs';
 
 @Injectable()
 export class PostsService implements OnModuleInit {
-  private postGrpcService: PostGrpcService;
+  private postGrpcService!: PostGrpcService;
 
   constructor(
     @Inject('POST_SERVICE_RABBITMQ')

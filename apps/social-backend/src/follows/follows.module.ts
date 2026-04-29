@@ -1,7 +1,10 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ClientsModule, Transport } from '@nestjs/microservices';
+
 import { join } from 'path';
+import { FollowsController } from './follows.controller';
+import { FollowsService } from './follows.service';
 
 @Module({
   imports: [
@@ -24,7 +27,7 @@ import { join } from 'path';
       },
     ]),
   ],
-  controllers: [],
-  providers: [],
+  controllers: [FollowsController],
+  providers: [FollowsService],
 })
 export class FollowsModule {}

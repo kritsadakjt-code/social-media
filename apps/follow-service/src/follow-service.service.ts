@@ -89,9 +89,7 @@ export class FollowService {
         this.unfollowedSchemaId,
         rawData,
       );
-      this.kafkaClient.emit('unfollowed', {
-        encodedPayload,
-      });
+      this.kafkaClient.emit('unfollowed', { value: encodedPayload });
       console.log(`✅ ส่งข้อความผ่าน Unfollowed Registry สำเร็จ! `);
     } catch (error) {
       console.log(
