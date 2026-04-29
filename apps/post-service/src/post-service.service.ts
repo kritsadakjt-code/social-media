@@ -7,11 +7,13 @@ import { status } from '@grpc/grpc-js';
 import { Comment, CommentDocument } from './comment.schema';
 import { PostCreatedSchema, PostLikedSchema, registry } from '@app/shared';
 import { SchemaType } from '@kafkajs/confluent-schema-registry';
+import { PostCommentedSchema } from '@app/shared/kafka/schemas/posts/commented-post.schema';
 
 @Injectable()
 export class PostService implements OnModuleInit {
   private postCreatedSchemaId!: number;
   private postLikedSchemaId!: number;
+  private postCommentSchemaId!: number;
 
   constructor(
     @InjectModel(Post.name) private postModel: Model<Post>,
@@ -35,6 +37,12 @@ export class PostService implements OnModuleInit {
         schema: JSON.stringify(PostLikedSchema),
       });
       this.postLikedSchemaId = postLiked.id;
+
+      const postComment = await registry.register({
+        type: SchemaType.AVRO,
+        schema: JSON.stringify(PostCommentedSchema),
+      });
+      this.postCommentSchemaId = postComment.id;
 
       console.log('✅ โหลด Schema ลง Memory สำเร็จ!');
     } catch (error) {
@@ -216,14 +224,31 @@ export class PostService implements OnModuleInit {
 
     const savedComment = await newComment.save();
 
-    this.kafkaClient.emit('post_commented', {
+    const rawData = {
       postId: data.postId,
       postOwnerId: post.userId, // เจ้าของโพสต์ (คนที่จะโดนแจ้งเตือน)
       commenterId: data.userId, // คนที่มาคอมเมนต์
       commenterName: data.username,
       content: data.content,
       timestamp: savedComment.createdAt?.toISOString(),
-    });
+    };
+    console.log(this.postCommentSchemaId);
+    try {
+      const encodePayload = await registry.encode(
+        this.postCommentSchemaId,
+        rawData,
+      );
+      this.kafkaClient.emit('post_events', {
+        key: data.postId,
+        value: encodePayload,
+        headers: {
+          event_type: 'post_commented',
+        },
+      });
+      console.log(`✅ ส่งข้อความ Post Comment ผ่าน Schema Registry สำเร็จ!`);
+    } catch (error) {
+      console.error('❌ ไม่สามารถส่งข้อความ post_comment ได้:', error);
+    }
 
     return {
       id: savedComment._id.toString(),

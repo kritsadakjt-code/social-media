@@ -73,7 +73,7 @@ export class NotificationServiceController {
     //   unknown
     // >;
 
-    console.log(`📥 รับ Event: post_liked กำลังกระจายเข้าสู่ CQRS EventBus`);
+    console.log(`📥 รับ Event: กำลังกระจายเข้าสู่ CQRS EventBus`);
     const eventInstance = createNotificationEvent(eventType, decodedData);
 
     console.log(eventInstance);

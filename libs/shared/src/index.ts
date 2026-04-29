@@ -19,4 +19,5 @@ export * from './kafka/schemas/posts/liked-post.schema';
 export * from './kafka/schemas/follows/unfollowed.schema';
 export * from './kafka/schemas/users/register.schema';
 
-export * from './interfaces/posts/post.interface';
+export * from './interfaces-events/posts/post-liked.interface';
+export * from './interfaces-events/posts/post-commented.interface';
