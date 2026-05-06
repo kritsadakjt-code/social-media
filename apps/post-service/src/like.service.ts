@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Like, LikeDocument } from './like.schema';
 import { Model } from 'mongoose';
@@ -10,8 +10,9 @@ import { SchemaType } from '@kafkajs/confluent-schema-registry';
 import { status } from '@grpc/grpc-js';
 
 @Injectable()
-export class LikeSerivce {
+export class LikeService {
   private postLikedSchemaId!: number;
+  private readonly logger = new Logger(LikeService.name);
 
   constructor(
     @InjectModel(Like.name) private readonly likeModel: Model<LikeDocument>,
@@ -31,11 +32,17 @@ export class LikeSerivce {
     this.postLikedSchemaId = postLiked.id;
   }
 
-  async Like(postId: string, userId: string, idempotencyKey: string) {
-    // chk idempotency กัน request ซํ้า
+  async likePost(postId: string, userId: string, idempotencyKey: string) {
+    // chk idempotency กัน network retry request ซํ้า
+    // ถ้าไม่เช็ค idempotency เเล้ว network timeout พอดีจากที่กดไลก์จะกลายเป็นไม่ได้กดทําให้เสีย ux ซึ่งมันจะไปทํา flow ของ unlike
+    // ถ้ามี idempotency กันไว้ มันจะไม่ไปทํา unlike
     const idempotencyRedisKey = `idempotency:like:${idempotencyKey}`;
     const alreadyProcessed = await this.redis.get(idempotencyRedisKey);
+
     if (alreadyProcessed) {
+      this.logger.log(
+        `🛡️ [Idempotency] ตรวจพบ Request ซ้ำ! Key: ${idempotencyKey} `,
+      );
       return JSON.parse(alreadyProcessed) as {
         success: boolean;
         liked: boolean;
@@ -72,8 +79,18 @@ export class LikeSerivce {
 
     // update redis counter
     const redisCounterKey = `likes:post:${postId}`;
+
+    // ที่ต้อง chk key เพราะถ้า key expired เเล้วจํานวน like จะเริ่มนับ 0 ใหม่
+    // ซึ่งมันเป็นโพสต์เก่าควรเริ่มจากจํานวน like ใน db
+    const keyExists = await this.redis.exists(redisCounterKey);
+    // ถ้าไม่มี key ให้เอาจํานวนไลก์จาก db มา
+    if (!keyExists) {
+      const currentLikes = post.likes ?? 0;
+      await this.redis.setex(redisCounterKey, 604800, currentLikes);
+    }
+    // ถ้ามี key อยู่เเล้วจะทําส่วนนี้เลย ออกเเบบมาเพื่อโพสต์ที่เป็น viral เพื่อให้เเสดงจํานวนไลก์ได้รวดเร็ว
     const newCount = await this.redis.incrby(redisCounterKey, likeDelta);
-    // expire 7 วัน กัน key ค้าง
+    // expire 7 วัน
     await this.redis.expire(redisCounterKey, 604800);
 
     // Push ลง Batch Queue (จะ sync ลง MongoDB ทีหลัง) lpush ให้ข้อมูลใหม่อยู่ซ้ายสุด
@@ -105,9 +122,10 @@ export class LikeSerivce {
 
     const result = { success: true, liked, likes: newCount };
 
-    // บันทึก Idempotency result ไว้ 24 ชั่วโมง
-    await this.redis.setex(idempotencyKey, 86400, JSON.stringify(result));
+    // บันทึก Idempotency result ไว้ 24 ชั่วโมง ถ้า request เข้ามาหลายล้านลดเวลาลงได้
+    await this.redis.setex(idempotencyRedisKey, 86400, JSON.stringify(result));
 
+    console.log(result);
     return result;
   }
 

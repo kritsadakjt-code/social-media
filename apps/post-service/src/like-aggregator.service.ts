@@ -80,7 +80,7 @@ export class LikeAggregatorService implements OnModuleInit {
       // acc = { "123": 1 }
       // ตัวอย่าง รอบที่ 2
       // acc = { "123": 2 }
-    }, {}); // กําหนดค่าเริ่มต้น acc = {} ตัวอย่างผลลัพธ์ที่ต้องการ acc = { "123": 2, "456": 3 }
+    }, {}); // กําหนดค่าเริ่มต้น acc = {} ตัวอย่างผลลัพธ์สุดท้ายที่ต้องการ acc = { "123": 2, "456": 3 }
   }
 
   private async bulkUpdateLikes(

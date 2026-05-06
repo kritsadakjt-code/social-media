@@ -1,3 +1,5 @@
+import { LikeService } from './like.service';
+
 import { Controller } from '@nestjs/common';
 import { PostService } from './post-service.service';
 import {
@@ -9,7 +11,10 @@ import {
 
 @Controller()
 export class PostServiceController {
-  constructor(private readonly postService: PostService) {}
+  constructor(
+    private readonly postService: PostService,
+    private readonly likeService: LikeService,
+  ) {}
 
   // queue RabbitMQ ชื่อ 'create_post'
   @EventPattern('create_post')
@@ -42,9 +47,17 @@ export class PostServiceController {
   }
 
   @GrpcMethod('PostService', 'LikePost')
-  async likePost(data: { postId: string; userId: string }) {
+  async likePost(data: {
+    postId: string;
+    userId: string;
+    idempotencyKey: string;
+  }) {
     try {
-      return await this.postService.likePost(data.postId, data.userId);
+      return await this.likeService.likePost(
+        data.postId,
+        data.userId,
+        data.idempotencyKey,
+      );
     } catch (error) {
       console.error('❌ กดไลก์ไม่สำเร็จ:', error);
       throw error;
