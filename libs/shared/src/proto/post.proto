@@ -8,7 +8,7 @@ service PostService {
   rpc GetPostsByIds (PostIdsRequest) returns (PostList) {}
   rpc GetPostsByUserId (GetPostsByUserIdRequest) returns (PostList) {}
 
-  rpc LikePost (LikePostRequest) returns (PostData) {}
+  rpc LikePost (LikePostRequest) returns (LikePostResponse) {}
 
   rpc AddComment (AddCommentRequest) returns (CommentData) {}
   rpc GetCommentsByPostId (GetCommentsRequest) returns (CommentListResponse) {}
@@ -44,6 +44,13 @@ message GetPostsByUserIdRequest {
 message LikePostRequest {
   string postId = 1;
   string userId = 2; // คนที่กดไลก์
+  string idempotencyKey = 3;
+}
+
+message LikePostResponse {
+  bool success = 1;
+  bool liked = 2;   // true = liked, false = unliked
+  int32 likes = 3; // จํานวน
 }
 
 message AddCommentRequest {

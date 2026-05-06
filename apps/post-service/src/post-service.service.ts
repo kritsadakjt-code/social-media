@@ -153,52 +153,52 @@ export class PostService implements OnModuleInit {
     };
   }
 
-  async likePost(postId: string, userId: string) {
-    const updatedPost = await this.postModel.findByIdAndUpdate(
-      postId,
-      { $inc: { likes: 1 } }, //ไป +1
-      { returnDocument: 'after' }, // return ข้อมูลที่เเก้ไข
-    );
-    if (!updatedPost) {
-      throw new RpcException({
-        code: status.NOT_FOUND,
-        message: 'ไม่พบโพสต์นี้ในระบบ',
-      });
-    }
+  // async likePost(postId: string, userId: string) {
+  //   const updatedPost = await this.postModel.findByIdAndUpdate(
+  //     postId,
+  //     { $inc: { likes: 1 } }, //ไป +1
+  //     { returnDocument: 'after' }, // return ข้อมูลที่เเก้ไข
+  //   );
+  //   if (!updatedPost) {
+  //     throw new RpcException({
+  //       code: status.NOT_FOUND,
+  //       message: 'ไม่พบโพสต์นี้ในระบบ',
+  //     });
+  //   }
 
-    const rawData = {
-      postId: updatedPost._id.toString(),
-      postOwnerId: updatedPost.userId, // เจ้าของโพสต์ (คนที่จะโดนแจ้งเตือน)
-      likedByUserId: userId, // คนที่ไปกดไลก์
-      timestamp: new Date().toISOString(),
-    };
-    try {
-      const encodedPayload = await registry.encode(
-        this.postLikedSchemaId,
-        rawData,
-      );
-      this.kafkaClient.emit('post_events', {
-        key: postId,
-        value: encodedPayload,
-        headers: {
-          event_type: 'post_liked',
-        },
-      });
-      console.log(`✅ ส่งข้อความ Post Liked ผ่าน Schema Registry สำเร็จ!`);
-    } catch (error) {
-      console.error('❌ ไม่สามารถส่งข้อความ post_liked ได้:', error);
-    }
+  //   const rawData = {
+  //     postId: updatedPost._id.toString(),
+  //     postOwnerId: updatedPost.userId, // เจ้าของโพสต์ (คนที่จะโดนแจ้งเตือน)
+  //     likedByUserId: userId, // คนที่ไปกดไลก์
+  //     timestamp: new Date().toISOString(),
+  //   };
+  //   try {
+  //     const encodedPayload = await registry.encode(
+  //       this.postLikedSchemaId,
+  //       rawData,
+  //     );
+  //     this.kafkaClient.emit('post_events', {
+  //       key: postId,
+  //       value: encodedPayload,
+  //       headers: {
+  //         event_type: 'post_liked',
+  //       },
+  //     });
+  //     console.log(`✅ ส่งข้อความ Post Liked ผ่าน Schema Registry สำเร็จ!`);
+  //   } catch (error) {
+  //     console.error('❌ ไม่สามารถส่งข้อความ post_liked ได้:', error);
+  //   }
 
-    return {
-      id: updatedPost._id.toString(),
-      userId: updatedPost.userId,
-      username: updatedPost.username,
-      content: updatedPost.content,
-      likes: updatedPost.likes,
-      createdAt:
-        updatedPost.createdAt?.toISOString() || new Date().toISOString(),
-    };
-  }
+  //   return {
+  //     id: updatedPost._id.toString(),
+  //     userId: updatedPost.userId,
+  //     username: updatedPost.username,
+  //     content: updatedPost.content,
+  //     likes: updatedPost.likes,
+  //     createdAt:
+  //       updatedPost.createdAt?.toISOString() || new Date().toISOString(),
+  //   };
+  // }
 
   async addComment(data: {
     postId: string;

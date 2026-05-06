@@ -2,19 +2,26 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
   Param,
   Post,
   Request,
   UseGuards,
 } from '@nestjs/common';
 
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiHeader,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import { CreatePostDto } from '@app/shared/dto/users/posts/create-post.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CreateCommentDto } from '@app/shared/dto/users/posts/create-comment.dto';
 
 import type { RequestWithUser } from '../interfaces/request.interface';
 import { PostsService } from './posts.service';
+import { v4 as uuidv4 } from 'uuid';
 
 @ApiTags('Posts')
 @Controller('posts')
@@ -68,11 +75,23 @@ export class PostsController {
   @Post(':id/like')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Like a post' })
-  likePost(@Request() req: RequestWithUser, @Param('id') postId: string) {
+  @ApiOperation({ summary: 'Like or Unlike a post' })
+  @ApiHeader({
+    name: 'x-idempotency-key',
+    required: false,
+  })
+  likePost(
+    @Request() req: RequestWithUser,
+    @Param('id') postId: string,
+    @Headers('x-idempotency-key') idempotencyKey?: string, //รับจาก client ถ้าไม่มีสร้างเอง
+  ) {
     console.log(`[GATEWAY] User ${req.user.userId} กำลังกดไลก์โพสต์ ${postId}`);
 
-    return this.postsService.likePost(postId, req.user.userId);
+    return this.postsService.likePost(
+      postId,
+      req.user.userId,
+      idempotencyKey ?? uuidv4(),
+    );
   }
 
   // add comment

@@ -50,8 +50,8 @@ export class PostsService implements OnModuleInit {
     return this.postGrpcService.getPostsByUserId({ userId: targetUserId });
   }
 
-  likePost(postId: string, userId: string) {
-    return this.postGrpcService.likePost({ postId, userId });
+  likePost(postId: string, userId: string, idempotencyKey: string) {
+    return this.postGrpcService.likePost({ postId, userId, idempotencyKey });
   }
 
   addComment(

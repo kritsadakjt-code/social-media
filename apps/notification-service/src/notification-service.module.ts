@@ -8,6 +8,8 @@ import { JwtModule } from '@nestjs/jwt';
 import { PostLikedHandler } from './handlers/posts/post-liked.handler';
 import { CqrsModule } from '@nestjs/cqrs';
 import { PostCommentHandler } from './handlers/posts/post-comment.handler';
+import { LikeThrottleService } from './like-throttle.service';
+import Redis from 'ioredis';
 
 @Module({
   imports: [
@@ -30,6 +32,16 @@ import { PostCommentHandler } from './handlers/posts/post-comment.handler';
     NotificationGateway,
     PostLikedHandler,
     PostCommentHandler,
+    LikeThrottleService, // เพิ่ม
+    {
+      provide: 'REDIS_CLIENT',
+      useFactory: (configService: ConfigService) =>
+        new Redis({
+          host: configService.get('REDIS_HOST', 'localhost'),
+          port: configService.get('REDIS_PORT', 6379),
+        }),
+      inject: [ConfigService],
+    },
   ],
 })
 export class NotificationServiceModule {}

@@ -21,3 +21,5 @@ export * from './kafka/schemas/users/register.schema';
 
 export * from './interfaces-events/posts/post-liked.interface';
 export * from './interfaces-events/posts/post-commented.interface';
+
+export * from './interfaces/posts/like.interface';
