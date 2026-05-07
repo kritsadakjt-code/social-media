@@ -133,23 +133,11 @@ export class PostService implements OnModuleInit {
     };
   }
 
-  async getPostsByUserId(userId: string) {
-    const posts = await this.postModel
-      .find({ userId: userId })
-      .sort({ createdAt: -1 })
-      .exec();
+  async getPostsByUserId(userId: string): Promise<{ ids: string[] }> {
+    const posts = await this.postModel.find({ userId }).select('_id').exec();
 
     return {
-      posts: posts.map((post) => ({
-        id: post._id.toString(),
-        userId: post.userId,
-        username: post.username,
-        content: post.content,
-        likes: post.likes,
-        createdAt: post.createdAt
-          ? post.createdAt.toISOString()
-          : new Date().toISOString(),
-      })),
+      ids: posts.map((post) => post._id.toString()),
     };
   }
 

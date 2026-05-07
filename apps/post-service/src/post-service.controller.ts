@@ -79,7 +79,7 @@ export class PostServiceController {
     return this.postService.getCommentsByPostId(data.postId);
   }
 
-  @MessagePattern('get_posts_for_feed_cleanup')
+  @MessagePattern('get_post_ids_for_feed_cleanup')
   async getPostsForCleanup(@Payload() data: { userId: string }) {
     return this.postService.getPostsByUserId(data.userId);
   }
