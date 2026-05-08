@@ -51,7 +51,7 @@ export class PostsController {
     return this.postsService.getFeed();
   }
 
-  // ดึงหน้า feed ว่าคนนั้นต้องเห็น post อะไรบ้าง
+  // ดึงหน้า feed ว่าคนนั้นต้องเห็น post อะไรบ้างจาก redis
   @Get('feed')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)

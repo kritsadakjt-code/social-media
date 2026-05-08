@@ -68,7 +68,7 @@ export class PostLikedHandler implements IEventHandler<PostLikedEvent> {
 
     this.notificationGateway.sendNotificationToUser(payload.postOwnerId, {
       title: 'มีคนกดไลก์โพสต์ของคุณ!',
-      body: `User ID: ${payload.likedByUserId} กดไลก์โพสต์ของคุณ`,
+      body: body,
       postId: payload.postId,
       time: payload.timestamp,
     });

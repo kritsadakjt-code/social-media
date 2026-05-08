@@ -5,7 +5,7 @@ package post;
 service PostService {
   // ฟังก์ชันขอดึงข้อมูลโพสต์ทั้งหมด (ส่งหน้าเปล่าๆ ไป แล้วรับลิสต์กลับมา)
   rpc GetPosts (Empty) returns (PostList) {}
-  rpc GetPostsByIds (PostIdsRequest) returns (PostList) {}
+  rpc getPostsByPostIdsRedis (PostIdsRequest) returns (PostList) {}
   rpc GetPostsByUserId (GetPostsByUserIdRequest) returns (PostList) {}
 
   rpc LikePost (LikePostRequest) returns (LikePostResponse) {}

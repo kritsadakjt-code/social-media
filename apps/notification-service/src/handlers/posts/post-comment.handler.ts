@@ -9,7 +9,7 @@ export class PostCommentHandler implements IEventHandler<PostCommentEvent> {
   handle(event: PostCommentEvent) {
     const { payload } = event;
 
-    if ((payload.postOwnerId = payload.commenterId)) return;
+    if (payload.postOwnerId === payload.commenterId) return;
 
     console.log(`💬 [NEW COMMENT] ส่งแจ้งเตือนให้ ${payload.postOwnerId}`);
     this.notificationGateway.sendNotificationToUser(payload.postOwnerId, {

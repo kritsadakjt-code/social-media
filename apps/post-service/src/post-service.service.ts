@@ -113,7 +113,7 @@ export class PostService implements OnModuleInit {
     };
   }
 
-  async getPostsByIds(ids: string[]) {
+  async getPostsByPostIdsRedis(ids: string[]) {
     const posts = await this.postModel
       .find({ _id: { $in: ids } })
       .sort({ createdAt: -1 })
@@ -138,6 +138,24 @@ export class PostService implements OnModuleInit {
 
     return {
       ids: posts.map((post) => post._id.toString()),
+    };
+  }
+
+  async getPostsWithDetailByUserId(userId: string) {
+    const posts = await this.postModel
+      .find({ userId })
+      .sort({ createdAt: -1 })
+      .exec();
+
+    return {
+      posts: posts.map((post) => ({
+        id: post._id.toString(),
+        userId: post.userId,
+        username: post.username,
+        content: post.content,
+        likes: post.likes,
+        createdAt: post.createdAt?.toISOString() ?? new Date().toISOString(),
+      })),
     };
   }
 

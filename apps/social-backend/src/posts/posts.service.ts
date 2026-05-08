@@ -43,7 +43,9 @@ export class PostsService implements OnModuleInit {
     if (!postIds || postIds.length === 0) {
       return { posts: [] };
     }
-    return firstValueFrom(this.postGrpcService.getPostsByIds({ ids: postIds }));
+    return firstValueFrom(
+      this.postGrpcService.getPostsByPostIdsRedis({ ids: postIds }),
+    );
   }
 
   getPostsByUserId(targetUserId: string) {

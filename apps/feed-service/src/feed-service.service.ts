@@ -1,6 +1,6 @@
 import { registry } from '@app/shared';
 import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { ClientKafka, Payload } from '@nestjs/microservices';
+import { ClientKafka } from '@nestjs/microservices';
 import Redis from 'ioredis';
 import { firstValueFrom } from 'rxjs';
 
@@ -40,10 +40,7 @@ export class FeedService implements OnModuleInit {
     await this.kafkaClient.connect();
   }
 
-  async handlePostCreated(
-    @Payload()
-    encodedMessage: Buffer | { value: Buffer | string },
-  ) {
+  async handlePostCreated(encodedMessage: Buffer | { value: Buffer | string }) {
     let message: PostCreatedEventPayload;
 
     try {
@@ -98,7 +95,7 @@ export class FeedService implements OnModuleInit {
 
   async handleUnfollowed(
     // อาจเป็น string ได้ถ้าส่งมาตรงๆ เเบบยังไม่ใช้ schema registry
-    @Payload() encodedMessage: Buffer | { value: Buffer | string },
+    encodedMessage: Buffer | { value: Buffer | string },
   ) {
     let message: { followerId: string; followingId: string };
 

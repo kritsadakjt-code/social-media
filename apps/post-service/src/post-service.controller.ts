@@ -34,16 +34,16 @@ export class PostServiceController {
     return this.postService.getPosts();
   }
 
-  @GrpcMethod('PostService', 'GetPostsByIds')
-  async getPostsByIds(data: { ids: string[] }) {
+  @GrpcMethod('PostService', 'getPostsByPostIdsRedis')
+  async getPostsByPostIdsRedis(data: { ids: string[] }) {
     // ป้องกันกรณีส่ง Array ว่างมา
     const idsToSearch = data.ids || [];
-    return this.postService.getPostsByIds(idsToSearch);
+    return this.postService.getPostsByPostIdsRedis(idsToSearch);
   }
 
   @GrpcMethod('PostService', 'GetPostsByUserId')
   async getPostsByUserId(data: { userId: string }) {
-    return this.postService.getPostsByUserId(data.userId);
+    return this.postService.getPostsWithDetailByUserId(data.userId);
   }
 
   @GrpcMethod('PostService', 'LikePost')

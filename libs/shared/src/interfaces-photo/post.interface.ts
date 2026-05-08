@@ -31,7 +31,7 @@ export interface LikePostResponse {
 
 export interface PostGrpcService {
   getPosts(data: Record<string, never>): Observable<PostListResponse>;
-  getPostsByIds(data: { ids: string[] }): Observable<PostListResponse>;
+  getPostsByPostIdsRedis(data: { ids: string[] }): Observable<PostListResponse>;
   getPostsByUserId(data: { userId: string }): Observable<PostListResponse>;
   likePost(data: {
     postId: string;
