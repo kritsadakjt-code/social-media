@@ -8,6 +8,7 @@ import { ChatModule } from './chat/chat.module';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
+import { MediaModule } from './media/media.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis'
     PostsModule,
     FollowsModule,
     ChatModule,
+    MediaModule,
   ],
   controllers: [],
   providers: [

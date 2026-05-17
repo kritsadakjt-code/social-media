@@ -16,6 +16,23 @@ export class Post {
   @Prop({ default: 0 })
   likes!: number;
 
+  // media
+  @Prop({ type: String, default: null })
+  mediaId!: string | null;
+
+  @Prop({ type: String, default: null })
+  imageUrl!: string | null;
+
+  @Prop({ type: String, default: null })
+  videoUrl!: string | null;
+
+  @Prop({
+    type: String,
+    enum: ['none', 'processing', 'completed', 'failed'],
+    default: 'none',
+  })
+  mediaStatus!: 'none' | 'processing' | 'completed' | 'failed';
+
   // สร้างไว้เพื่อไม่ให้เเจ้ง unsafe เพราะ ts ไม่รู้จักชื่อนี้ถ้าไม่ประกาศ
   createdAt!: Date;
   updatedAt!: Date;

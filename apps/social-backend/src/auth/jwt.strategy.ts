@@ -9,16 +9,19 @@ interface JwtPayload {
   role: string;
 }
 
+// เช็ค token ทํางานอัตโนมัติ เมือมีการเรียก JwtAuthGuard
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(private configService: ConfigService) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      // false หมายถึงจะไปเช็ค exp ของ token
       ignoreExpiration: false,
       secretOrKey: configService.getOrThrow<string>('JWT_SECRET'),
     });
   }
 
+  // ถ้า token ถูก ค่าจะถูก set เข้า req อัตโนมัติผ่าน func นี้
   validate(payload: JwtPayload) {
     return {
       userId: payload.sub,
