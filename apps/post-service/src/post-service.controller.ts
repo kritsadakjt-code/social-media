@@ -3,8 +3,10 @@ import { LikeService } from './like.service';
 import { Controller } from '@nestjs/common';
 import { PostService } from './post-service.service';
 import {
+  Ctx,
   EventPattern,
   GrpcMethod,
+  KafkaContext,
   MessagePattern,
   Payload,
 } from '@nestjs/microservices';
@@ -82,5 +84,17 @@ export class PostServiceController {
   @MessagePattern('get_post_ids_for_feed_cleanup')
   async getPostsForCleanup(@Payload() data: { userId: string }) {
     return this.postService.getPostsByUserId(data.userId);
+  }
+
+  @EventPattern('media_events')
+  async handleMediaProcessed(
+    @Payload() encodedMessage: Buffer | { value: Buffer | string },
+    @Ctx() context: KafkaContext,
+  ) {
+    const eventType = context.getMessage().headers?.['event_type']?.toString();
+
+    if (eventType !== 'media_processed') return;
+
+    await this.postService.handleMediaProcessed(encodedMessage);
   }
 }

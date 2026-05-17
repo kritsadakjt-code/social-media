@@ -10,7 +10,11 @@ async function bootstrap() {
   const configService = app.get(ConfigService);
 
   const host = configService.get<string>('CHAT_SERVICE_HOST', '0.0.0.0');
-  const port = configService.get<number>('CHAT_SERVICE_PORT', 50053);
+  const grpcPort = configService.get<number>('CHAT_SERVICE_PORT', 3005);
+  const socketPort = configService.get<number>(
+    'CHAT_SERVICE_SOCKET_PORT',
+    50053,
+  );
 
   // เปิดใช้งาน redis adapter สำหรับ WebSockets
   const redisIoAdapter = new RedisIoAdapter(app);
@@ -22,13 +26,15 @@ async function bootstrap() {
     options: {
       package: 'chat',
       protoPath: join(process.cwd(), 'libs/shared/src/proto/chat.proto'),
-      url: `${host}:${port}`,
+      url: `${host}:${grpcPort}`,
     },
   });
   await app.startAllMicroservices();
 
   // web socket
-  await app.listen(3005);
-  console.log('🚀 Chat Service is running (gRPC: 50053, WebSockets: 3005)');
+  await app.listen(socketPort);
+  console.log(
+    `🚀 Chat Service is running on HTTP: ${socketPort} and gRPC: ${grpcPort}`,
+  );
 }
 bootstrap();

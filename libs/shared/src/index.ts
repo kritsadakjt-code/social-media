@@ -10,6 +10,7 @@ export * from './interfaces-photo/user.interface';
 export * from './interfaces-photo/chat.interface';
 export * from './interfaces-photo/follow.interface';
 export * from './interfaces-photo/post.interface';
+export * from './interfaces-photo/media.interface';
 
 export * from './guards/ws-jwt.guard';
 
@@ -23,3 +24,7 @@ export * from './interfaces-events/posts/post-liked.interface';
 export * from './interfaces-events/posts/post-commented.interface';
 
 export * from './interfaces/posts/like.interface';
+
+export * from './interfaces-events/media/media.interface';
+export * from './kafka/schemas/media/media-uploaded.schema';
+export * from './kafka/schemas/media/media-processed.schema';

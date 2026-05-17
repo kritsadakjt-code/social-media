@@ -5,7 +5,12 @@ import { Model } from 'mongoose';
 import { ClientKafka, RpcException } from '@nestjs/microservices';
 import { status } from '@grpc/grpc-js';
 import { Comment, CommentDocument } from './comment.schema';
-import { PostCreatedSchema, PostLikedSchema, registry } from '@app/shared';
+import {
+  MediaProcessedPayload,
+  PostCreatedSchema,
+  PostLikedSchema,
+  registry,
+} from '@app/shared';
 import { SchemaType } from '@kafkajs/confluent-schema-registry';
 import { PostCommentedSchema } from '@app/shared/kafka/schemas/posts/commented-post.schema';
 
@@ -282,5 +287,32 @@ export class PostService implements OnModuleInit {
         createdAt: c.createdAt?.toISOString(),
       })),
     };
+  }
+
+  // เพิ่มใน post-service.service.ts
+  async handleMediaProcessed(
+    encodedMessage: Buffer | { value: Buffer | string },
+  ) {
+    const bufferData = Buffer.isBuffer(encodedMessage)
+      ? encodedMessage
+      : Buffer.from(encodedMessage.value || '');
+
+    const payload = (await registry.decode(
+      bufferData,
+    )) as MediaProcessedPayload;
+
+    if (payload.purpose !== 'post') return;
+
+    // update post ที่มี mediaId นี้
+    await this.postModel.findOneAndUpdate(
+      { mediaId: payload.mediaId },
+      {
+        imageUrl: payload.mediumUrl,
+        videoUrl: payload.p720Url,
+        mediaStatus: 'completed',
+      },
+    );
+
+    console.log(`✅ update post media สำเร็จ: ${payload.mediaId}`);
   }
 }
