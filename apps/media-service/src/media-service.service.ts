@@ -20,7 +20,9 @@ import {
   registry,
 } from '@app/shared';
 import { SchemaType } from '@kafkajs/confluent-schema-registry';
-import { v4 as uuidv4 } from 'uuid';
+import { SnowflakeIdService } from './snowflake.service';
+import { createHash } from 'crypto';
+import { firstValueFrom } from 'rxjs';
 
 // MIME ควรเช็คว่าเป็นรูปหรือวิดีโอจริงมั้ยด้วย
 
@@ -50,6 +52,7 @@ export class MediaService implements OnModuleInit {
     private readonly mediaProcessorService: MediaProcessorService,
     @Inject('KAFKA_SERVICE')
     private readonly kafkaClient: ClientKafka,
+    private readonly snowflakeIdService: SnowflakeIdService,
   ) {}
 
   async onModuleInit() {
@@ -92,9 +95,15 @@ export class MediaService implements OnModuleInit {
     }
 
     // จัดระเบียบที่เก็บไฟล์ เพื่อป้องกัน hot partition ไม่ให้ overload
-    const mediaId = uuidv4();
+    const mediaId = this.snowflakeIdService.next();
     const ext = fileType.split('/')[1];
-    const key = `uploads/${userId}/${mediaId}.${ext}`;
+
+    // เข้ารหัสด้วย algorithm sha256
+    const shard = createHash('sha256')
+      .update(mediaId)
+      .digest('hex') // output hex pattern
+      .slice(0, 2); // 256 chars 16*16
+    const key = `uploads/${shard}/${userId}/${mediaId}.${ext}`;
 
     // สร้าง presigned URL
     const presignedUrl = await this.s3Service.createPresignedUploadUrl(
@@ -171,6 +180,7 @@ export class MediaService implements OnModuleInit {
 
       if (isImage) {
         urls = await this.mediaProcessorService.processImage(key, mediaId);
+        this.logger.log('urls from processorImage', urls);
       } else {
         urls = await this.mediaProcessorService.processVideo(key, mediaId);
       }
@@ -207,17 +217,77 @@ export class MediaService implements OnModuleInit {
     } catch (error) {
       const err = error as Error;
       this.logger.error(`❌ Process media ล้มเหลว: ${mediaId}`, err.message);
-      // update retry count
-      const media = await this.mediaModel.findById(mediaId);
-      const retryCount = (media?.retryCount ?? 0) + 1;
 
-      await this.mediaModel.findByIdAndUpdate(mediaId, {
-        status: retryCount >= 3 ? 'failed' : 'pending', // retry ได้ 3 ครั้ง
-        retryCount,
-        errorMessage: err.message,
-      });
+      // พยายาม process file ใหม่
+      // pipeline update กัน race condition
+      const updatedMedia = await this.mediaModel.findByIdAndUpdate(
+        mediaId,
+        [
+          {
+            $set: {
+              retryCount: { $add: [{ $ifNull: ['$retryCount', 0] }, 1] },
+              errorMessage: err.message,
+            },
+          },
+          {
+            $set: {
+              status: {
+                $cond: {
+                  if: { $gte: ['$retryCount', 3] },
+                  then: 'failed',
+                  else: 'pending',
+                },
+              },
+            },
+          },
+        ],
+        { new: true },
+      );
 
-      throw error; // ให้ Kafka DLQ จัดการ
+      // กรณีที่ user ลบรูปทิ้งไประหว่างประมวลผล
+      if (!updatedMedia) {
+        this.logger.warn(
+          `⚠️ ข้อมูล mediaId: ${mediaId} หายไปจากระบบแล้ว จบการทำงานทันที`,
+        );
+        return;
+      }
+
+      // ครบ retry 3 ครั้ง
+      if (updatedMedia.retryCount > 3) {
+        this.logger.warn(
+          `🗑️ โยนไฟล์ ${mediaId} ทิ้งเข้า DLQ เพราะพังครบ 3 รอบแล้ว!`,
+        );
+
+        try {
+          // ส่ง message ไป dlq ใน kafka เพื่อ debug
+          await firstValueFrom(
+            this.kafkaClient.emit('media_events_dlq', {
+              key: mediaId,
+              value: {
+                mediaId,
+                userId,
+                key,
+                fileType,
+                purpose,
+                retryCount: updatedMedia.retryCount,
+                originalError: err.message,
+                failedAt: new Date().toISOString(),
+              },
+              headers: {
+                event_type: 'media_process_failed',
+              },
+            }),
+          );
+        } catch (error) {
+          this.logger.error(`🚨 ส่งไฟล์ ${mediaId} เข้า DLQ ล้มเหลว!`, error);
+          // ถ้าส่งเข้า dlq ไม่สําเร็จ retry process ใหม่
+          throw error;
+        }
+        // บอก kafka ทํางานต่อไปได้ ส่งเข้า dlq เเล้ว
+        return;
+      }
+      // ให้ kafka retry 3 ครั้ง
+      throw error;
     }
   }
 
