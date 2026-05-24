@@ -10,6 +10,7 @@ import { MediaProcessorController } from './processor/media-processor.controller
 import { S3Service } from './storage/s3.service';
 import { CloudFrontService } from './storage/cloudfront.service';
 import { MediaProcessorService } from './processor/media-processor.service';
+import { SnowflakeIdService } from './snowflake.service';
 
 @Module({
   imports: [
@@ -41,6 +42,11 @@ import { MediaProcessorService } from './processor/media-processor.service';
           options: {
             client: {
               brokers: [configService.getOrThrow<string>('KAFKA_BROKER')],
+              retry: {
+                initialRetryTime: 1000, // เว้นระยะ 1 วินาที
+                retries: 3,
+                multiplier: 2, // *2
+              },
             },
             producerOnlyMode: true,
           },
@@ -55,6 +61,7 @@ import { MediaProcessorService } from './processor/media-processor.service';
     S3Service,
     CloudFrontService,
     MediaProcessorService,
+    SnowflakeIdService,
   ],
 })
 export class MediaServiceModule {}
