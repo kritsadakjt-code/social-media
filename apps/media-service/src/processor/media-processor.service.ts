@@ -1,4 +1,3 @@
-// apps/media-service/src/processor/media-processor.service.ts
 import { Injectable, Logger } from '@nestjs/common';
 import sharp from 'sharp';
 import ffmpeg from 'fluent-ffmpeg';
@@ -7,6 +6,7 @@ import { CloudFrontService } from '../storage/cloudfront.service';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import * as os from 'os';
+import { createHash } from 'crypto';
 
 export interface ProcessedUrls {
   originalUrl: string;
@@ -32,23 +32,28 @@ export class MediaProcessorService {
     // ดาวน์โหลดจาก S3
     const buffer = await this.s3Service.downloadFile(key);
 
-    const basePath = `processed/${mediaId}`;
+    const shard = createHash('sha256')
+      .update(mediaId)
+      .digest('hex')
+      .slice(0, 2);
+
+    const basePath = `processed/${shard}/${mediaId}`;
 
     // สร้าง 3 ขนาด พร้อมกัน
     const [thumbnail, medium, original] = await Promise.all([
-      // Thumbnail 150x150
+      // Thumbnail 150x150 สําหรับ chat
       sharp(buffer)
         .resize(150, 150, { fit: 'cover' })
         .webp({ quality: 70 })
         .toBuffer(),
 
-      // Medium 600x600
+      // Medium 600x600 สําหรับ feed
       sharp(buffer)
         .resize(600, 600, { fit: 'inside', withoutEnlargement: true })
         .webp({ quality: 80 })
         .toBuffer(),
 
-      // Original — แค่ compress
+      // Original — แค่ compress สําหรับดูรูปเต็ม
       sharp(buffer).webp({ quality: 85 }).toBuffer(),
     ]);
 
@@ -79,8 +84,13 @@ export class MediaProcessorService {
     const inputPath = path.join(tmpDir, 'input.mp4');
 
     await fs.writeFile(inputPath, buffer);
+    this.logger.log(`🎥 กำลัง process วิดีโอ: ${key}`);
+    const shard = createHash('sha256')
+      .update(mediaId)
+      .digest('hex')
+      .slice(0, 2);
 
-    const basePath = `processed/${mediaId}`;
+    const basePath = `processed/${shard}/${mediaId}`;
     const qualities = [
       { name: 'p360', height: 360 },
       { name: 'p720', height: 720 },
@@ -131,9 +141,26 @@ export class MediaProcessorService {
           '-movflags +faststart', // เล่นได้ทันทีไม่ต้อง download จบก่อน
         ])
         .output(outputPath)
+        // เพิ่ม แสดง % ความคืบหน้าให้รู้ว่าไม่ค้าง
+        .on('progress', (progress) => {
+          if (progress.percent) {
+            this.logger.debug(
+              `⏳ กำลังแปลงวิดีโอขนาด ${height}p... ทำเสร็จไปแล้ว ${Math.round(progress.percent)}%`,
+            );
+          }
+        })
         // ใช้ () => ไม่รับค่าใดๆ เนื่องจาก ffmpeg ส่ง (stdout, stderr) resolve รับเเค่ค่าเดียวหรือ optional
-        .on('end', () => resolve)
-        .on('error', reject)
+        .on('end', () => {
+          this.logger.log(`✅ แปลงวิดีโอขนาด ${height}p เสร็จสมบูรณ์!`);
+          resolve();
+        })
+        .on('error', (err, stdout, stderr) => {
+          this.logger.error(
+            `❌ FFmpeg พังตอนแปลงขนาด ${height}p: ${err.message}`,
+          );
+          this.logger.error(`สาเหตุเบื้องลึก: ${stderr}`);
+          reject(err);
+        })
         .run();
     });
   }

@@ -60,6 +60,9 @@ export class Media {
   @Prop({ type: String, default: null })
   errorMessage!: string | null;
 
+  @Prop({ type: Date, default: null })
+  failedAt!: Date | null;
+
   createdAt!: Date;
   updatedAt!: Date;
 }

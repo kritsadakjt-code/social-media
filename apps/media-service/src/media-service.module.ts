@@ -11,6 +11,7 @@ import { S3Service } from './storage/s3.service';
 import { CloudFrontService } from './storage/cloudfront.service';
 import { MediaProcessorService } from './processor/media-processor.service';
 import { SnowflakeIdService } from './snowflake.service';
+import { OutboxEvent, OutboxSchema } from './outbox/outbox.schema';
 
 @Module({
   imports: [
@@ -23,7 +24,10 @@ import { SnowflakeIdService } from './snowflake.service';
       inject: [ConfigService],
     }),
 
-    MongooseModule.forFeature([{ name: Media.name, schema: MediaSchema }]),
+    MongooseModule.forFeature([
+      { name: Media.name, schema: MediaSchema },
+      { name: OutboxEvent.name, schema: OutboxSchema },
+    ]),
 
     JwtModule.registerAsync({
       imports: [ConfigModule],

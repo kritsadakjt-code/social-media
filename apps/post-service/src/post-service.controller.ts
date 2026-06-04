@@ -21,7 +21,13 @@ export class PostServiceController {
   // queue RabbitMQ ชื่อ 'create_post'
   @EventPattern('create_post')
   async handlePostCreate(
-    @Payload() data: { userId: string; username: string; content: string },
+    @Payload()
+    data: {
+      userId: string;
+      username: string;
+      content: string;
+      mediaId?: string;
+    },
   ) {
     console.log('📥 [Post Service] ได้รับคำสั่งสร้างโพสต์ใหม่จาก Gateway');
     try {
@@ -86,6 +92,7 @@ export class PostServiceController {
     return this.postService.getPostsByUserId(data.userId);
   }
 
+  // รับ event จากการ process file เสร็จเเล้ว
   @EventPattern('media_events')
   async handleMediaProcessed(
     @Payload() encodedMessage: Buffer | { value: Buffer | string },
@@ -93,8 +100,13 @@ export class PostServiceController {
   ) {
     const eventType = context.getMessage().headers?.['event_type']?.toString();
 
-    if (eventType !== 'media_processed') return;
-
-    await this.postService.handleMediaProcessed(encodedMessage);
+    if (eventType === 'media_processed') {
+      return this.postService.handleMediaProcessed(encodedMessage);
+      // รับ event จาก worker
+    } else if (eventType === 'media_process_failed') {
+      return this.postService.handleMediaProcessFailed(encodedMessage);
+    } else {
+      console.log(`ข้าม Event ที่ไม่เกี่ยวข้อง: ${eventType}`);
+    }
   }
 }

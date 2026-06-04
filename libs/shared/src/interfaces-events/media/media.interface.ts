@@ -17,3 +17,11 @@ export interface MediaProcessedPayload {
   p720Url?: string;
   p1080Url?: string;
 }
+
+export interface MediaProcessFailedPayload {
+  mediaId: string;
+  userId: string;
+  purpose: 'post' | 'avatar' | 'chat';
+  errorMessage: string;
+  failedAt: string;
+}

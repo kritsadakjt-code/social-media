@@ -15,9 +15,9 @@ import {
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
-import { CreatePostDto } from '@app/shared/dto/users/posts/create-post.dto';
+import { CreatePostDto } from '@app/shared/dto/posts/create-post.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { CreateCommentDto } from '@app/shared/dto/users/posts/create-comment.dto';
+import { CreateCommentDto } from '@app/shared/dto/posts/create-comment.dto';
 
 import type { RequestWithUser } from '../interfaces/request.interface';
 import { PostsService } from './posts.service';
@@ -40,6 +40,7 @@ export class PostsController {
       req.user.userId,
       req.user.username,
       createPostDto.content,
+      createPostDto.mediaId,
     );
   }
 
