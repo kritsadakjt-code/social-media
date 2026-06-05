@@ -7,6 +7,7 @@ import { status } from '@grpc/grpc-js';
 import { Comment, CommentDocument } from './comment.schema';
 import {
   MediaProcessedPayload,
+  MediaProcessFailedPayload,
   PostCreatedSchema,
   PostLikedSchema,
   registry,
@@ -59,11 +60,14 @@ export class PostService implements OnModuleInit {
     userId: string;
     username: string;
     content: string;
+    mediaId?: string;
   }) {
     const newPost = new this.postModel({
       userId: data.userId,
       username: data.username,
       content: data.content,
+      mediaId: data.mediaId ?? null,
+      mediaStatus: data.mediaId ? 'processing' : 'none',
     });
 
     const savedPost = await newPost.save();
@@ -289,7 +293,7 @@ export class PostService implements OnModuleInit {
     };
   }
 
-  // เพิ่มใน post-service.service.ts
+  // process media success
   async handleMediaProcessed(
     encodedMessage: Buffer | { value: Buffer | string },
   ) {
@@ -314,5 +318,27 @@ export class PostService implements OnModuleInit {
     );
 
     console.log(`✅ update post media สำเร็จ: ${payload.mediaId}`);
+  }
+
+  // process media failed
+  async handleMediaProcessFailed(
+    encodedMessage: Buffer | { value: Buffer | string },
+  ) {
+    const bufferData = Buffer.isBuffer(encodedMessage)
+      ? encodedMessage
+      : Buffer.from(encodedMessage.value || '');
+
+    const payload = (await registry.decode(
+      bufferData,
+    )) as MediaProcessFailedPayload;
+
+    if (payload.purpose !== 'post') return;
+
+    await this.postModel.findOneAndUpdate(
+      { mediaId: payload.mediaId },
+      {
+        mediaStatus: 'failed',
+      },
+    );
   }
 }

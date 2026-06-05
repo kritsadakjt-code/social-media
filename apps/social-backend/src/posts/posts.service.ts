@@ -25,8 +25,18 @@ export class PostsService implements OnModuleInit {
     await this.feedKafkaClient.connect();
   }
 
-  createPost(userId: string, username: string, content: string) {
-    this.postRabbitClient.emit('create_post', { userId, username, content });
+  createPost(
+    userId: string,
+    username: string,
+    content: string,
+    mediaId?: string,
+  ) {
+    this.postRabbitClient.emit('create_post', {
+      userId,
+      username,
+      content,
+      mediaId,
+    });
     return { message: 'ระบบกำลังสร้างโพสต์ของคุณอยู่เบื้องหลัง' };
   }
 

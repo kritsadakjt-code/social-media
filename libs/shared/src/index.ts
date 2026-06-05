@@ -28,3 +28,4 @@ export * from './interfaces/posts/like.interface';
 export * from './interfaces-events/media/media.interface';
 export * from './kafka/schemas/media/media-uploaded.schema';
 export * from './kafka/schemas/media/media-processed.schema';
+export * from './kafka/schemas/media/media-process-failed.schema';
