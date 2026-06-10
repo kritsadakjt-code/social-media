@@ -21,12 +21,13 @@ export class MediaOutBoxWorker implements OnModuleInit {
     private readonly kafkaClient: ClientKafka,
   ) {}
 
-  onModuleInit() {
+  async onModuleInit() {
+    await this.kafkaClient.connect();
     this.logger.log('✅ Outbox Worker started');
   }
 
   @Cron(CronExpression.EVERY_10_SECONDS)
-  async proocessOutbox() {
+  async processOutbox() {
     const MaxAttempts = 10;
     const now = new Date();
 

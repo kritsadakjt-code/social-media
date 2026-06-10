@@ -18,7 +18,8 @@ message CreatePresignedUrlRequest {
 message CreatePresignedUrlResponse {
   string mediaId = 1;
   string presignedUrl = 2;
-  string key = 3;
+  map<string, string> uploadFields = 3;
+  string key = 4;
 }
 
 message ConfirmUploadRequest {

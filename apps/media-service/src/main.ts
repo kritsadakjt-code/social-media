@@ -16,7 +16,16 @@ async function bootstrap() {
     transport: Transport.KAFKA,
     options: {
       client: { brokers: [kafkaBroker] },
-      consumer: { groupId: 'media-consumer' },
+      consumer: {
+        groupId: 'media-consumer',
+
+        sessionTimeout: 60000, // ตั้งค่าเพดานเวลา kafka รอ heartbeat ไม่เกิน 1 นาที
+        heartbeatInterval: 20000, // defualt = 3s หน่วงเวลาเป็น 20 วิเพื่อให้ cpu ได้มีเวลาส่ง heartbeat กรณีที่ cpu ทํางานหนักมากๆ
+        // kafka ควรทําหน้าที่ส่งอย่างเดียว ไม่ควรรองานนาน ควรเเยกการเเปลงไฟล์ ท่อไฟล์เล็ก ไฟล์ใหญ่ เพื่อความเร็ว
+        // เวลาคํานวณจาก งานที่ service ใช้เวลาทํางานที่สุด เช่น เเปลง vdo ขนาดสูงสุดใช้เวลาเท่าไร
+        // ตั้งค่าเพดานเวลา worker ต้อง commit ภายใน 15 นาที ป้องกันกรณีที่ worker ค้าง ติดลูป หรือต้องทํางานที่นานเช่น เเปลง vdo นานเกินเวลาที่คํานวณไว้
+        maxPollIntervalMs: 900000, // defualt = 5 m
+      },
     },
   });
   // gRPC

@@ -119,6 +119,7 @@ export class MediaService implements OnModuleInit {
     const presignedUrl = await this.s3Service.createPresignedUploadUrl(
       key,
       fileType,
+      maxSize,
       300, // 5 นาที
     );
 
@@ -129,41 +130,94 @@ export class MediaService implements OnModuleInit {
       key,
       fileType,
       purpose,
+      fileSize,
       status: 'pending',
     });
 
-    this.logger.log(`✅ สร้าง Presigned URL สำหรับ ${userId} สำเร็จ`);
+    this.logger.log(`✅ สร้าง Presigned URL สำหรับ UserID:${userId} สำเร็จ`);
 
-    return { mediaId, presignedUrl, key };
+    return {
+      mediaId,
+      presignedUrl: presignedUrl.url,
+      uploadFields: presignedUrl.fields,
+      key,
+    };
   }
 
   async confirmUpload(mediaId: string, userId: string) {
-    const media = await this.mediaModel.findById(mediaId);
+    const media = await this.mediaModel.findOne({
+      _id: mediaId,
+      userId,
+      status: 'pending',
+    });
 
     if (!media) {
-      throw new NotFoundException('ไม่พบไฟล์นี้ในระบบ');
+      throw new NotFoundException(
+        'ไม่พบไฟล์นี้ หรือไฟล์ไม่ได้อยู่ในสถานะ pending',
+      );
+    }
+    // อ่าน spec ไฟล์ใน s3
+    const objectMeta = await this.s3Service.headObject(media.key);
+
+    // อยากรู้เเค่ size ส่วน type เช็คตอน presigned เเล้ว
+    const isImage = ALLOWED_IMAGE_TYPES.includes(media.fileType);
+    const maxSize = isImage ? MAX_IMAGE_SIZE : MAX_VIDEO_SIZE;
+
+    if (!objectMeta.contentLength || objectMeta.contentLength <= 0) {
+      throw new Error('ไม่พบไฟล์ที่ upload หรือไฟล์ว่าง');
     }
 
-    if (media.userId !== userId) {
-      throw new Error('ไม่มีสิทธิ์เข้าถึงไฟล์นี้');
+    if (objectMeta.contentLength > maxSize) {
+      await this.s3Service.deleteFile(media.key);
+
+      await this.mediaModel.findByIdAndUpdate(mediaId, {
+        status: 'failed',
+        errorMessage: 'ไฟล์จริงใหญ่เกิน limit',
+        failedAt: new Date(),
+      });
+
+      throw new Error('ไฟล์จริงใหญ่เกิน limit');
     }
 
-    if (media.status !== 'pending') {
-      throw new Error(`ไฟล์นี้อยู่ในสถานะ ${media.status} แล้ว`);
+    if (objectMeta.contentType !== media.fileType) {
+      await this.s3Service.deleteFile(media.key);
+
+      await this.mediaModel.findByIdAndUpdate(mediaId, {
+        status: 'failed',
+        errorMessage: 'ประเภทไฟล์จริงไม่ตรงกับที่แจ้งไว้',
+        failedAt: new Date(),
+      });
+
+      throw new Error('ประเภทไฟล์จริงไม่ตรงกับที่แจ้งไว้');
     }
 
     // update status
-    await this.mediaModel.findByIdAndUpdate(mediaId, {
-      status: 'processing',
-    });
+    const updatedMedia = await this.mediaModel.findOneAndUpdate(
+      {
+        _id: mediaId,
+        userId,
+        status: 'pending',
+      },
+      {
+        status: 'processing',
+        uploadedSize: objectMeta.contentLength,
+        uploadedContentType: objectMeta.contentType,
+        verifiedAt: new Date(),
+      },
+      { new: true },
+    );
+
+    if (!updatedMedia) {
+      throw new Error('ไฟล์นี้ถูก confirm ไปแล้ว หรือสถานะเปลี่ยนไปแล้ว');
+    }
 
     // emit Kafka ให้ processor รับ
     const encodedPayload = await registry.encode(this.mediaUploadedSchemaId, {
       mediaId,
       userId,
-      key: media.key,
-      fileType: media.fileType,
-      purpose: media.purpose,
+      key: updatedMedia.key,
+      fileType: updatedMedia.fileType,
+      purpose: updatedMedia.purpose,
     });
 
     this.kafkaClient.emit('media_events', {
@@ -249,9 +303,10 @@ export class MediaService implements OnModuleInit {
       const err = error as Error;
       this.logger.error(`❌ Process media ล้มเหลว: ${mediaId}`, err.message);
 
-      // pipeline update กัน race condition
+      // กัน race condition
       const updatedMedia = await this.mediaModel.findByIdAndUpdate(
         mediaId,
+        // aggregation pipeline
         [
           {
             $set: {
@@ -272,7 +327,9 @@ export class MediaService implements OnModuleInit {
           },
         ],
         // คืนค่าที่อัปเดตล่าสุดเเล้ว เพื่อเอาไปใช้ต่อ
-        { new: true },
+        // updatePipeline = บอก mongoose ว่าจะส่ง aggregation operation ใน findByIdAndUpdate เพื่อไม่ให้ mongoose คิดว่า syntax ผิด
+        // findByIdAndUpdate = default มักใช้ร่วมกับ update object เช่น $set, $inc, $push
+        { new: true, updatePipeline: true },
       );
 
       // กรณีที่ user ลบรูปทิ้งไประหว่างประมวลผล

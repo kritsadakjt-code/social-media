@@ -10,6 +10,7 @@ export interface CreatePresignedUrlRequest {
 export interface CreatePresignedUrlResponse {
   mediaId: string;
   presignedUrl: string;
+  uploadFields: Record<string, string>;
   key: string;
 }
 
