@@ -6,8 +6,9 @@ import {
   PutObjectCommand,
   GetObjectCommand,
   DeleteObjectCommand,
+  HeadObjectCommand,
 } from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { createPresignedPost } from '@aws-sdk/s3-presigned-post';
 
 @Injectable()
 export class S3Service {
@@ -32,15 +33,38 @@ export class S3Service {
   async createPresignedUploadUrl(
     key: string,
     contentType: string,
+    maxSize: number,
     expiresIn: number = 300, // 5 นาที
-  ): Promise<string> {
-    const command = new PutObjectCommand({
+  ) {
+    return createPresignedPost(this.s3, {
       Bucket: this.bucket,
       Key: key,
-      ContentType: contentType,
+      Fields: {
+        'Content-Type': contentType,
+      },
+      Conditions: [
+        ['content-length-range', 1, maxSize], // 1 btye - maxSize
+        ['eq', '$Content-Type', contentType],
+      ],
+      Expires: expiresIn,
     });
+  }
 
-    return getSignedUrl(this.s3, command, { expiresIn });
+  // เช็คไฟล์ตอน confirm upload
+  async headObject(key: string) {
+    // อ่านไฟล์จาก s3 ไม่ได้โหลด
+    const response = await this.s3.send(
+      new HeadObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+      }),
+    );
+
+    return {
+      contentLength: response.ContentLength ?? 0,
+      contentType: response.ContentType,
+      eTag: response.ETag, // ETag มาจากการ hash algorithm ของไฟล์เพื่อเช็คไฟล์ว่าง ไฟล์ซํ้า
+    };
   }
 
   // ดาวน์โหลดไฟล์จาก S3 เพื่อ process

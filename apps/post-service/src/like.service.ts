@@ -30,6 +30,8 @@ export class LikeService {
       schema: JSON.stringify(PostLikedSchema),
     });
     this.postLikedSchemaId = postLiked.id;
+
+    await this.kafkaClient.connect();
   }
 
   async likePost(postId: string, userId: string, idempotencyKey: string) {

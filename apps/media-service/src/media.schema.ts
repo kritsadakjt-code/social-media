@@ -63,6 +63,19 @@ export class Media {
   @Prop({ type: Date, default: null })
   failedAt!: Date | null;
 
+  // chk upload file
+  @Prop({ type: Number, required: true }) // chk size ตอน presigned คร่าวๆ ก่อนสร้าง URL
+  fileSize!: number;
+
+  @Prop({ type: Number, default: null })
+  uploadedSize!: number | null; // size จริงจาก s3 เพื่อ chk ขนาดเท่ากับ client เเจ้งมา
+
+  @Prop({ type: String, default: null })
+  uploadedContentType!: string | null; // type จริงจาก s3 เพื่อ chk type ตรงกับ client เเจ้งมา
+
+  @Prop({ type: Date, default: null })
+  verifiedAt!: Date | null;
+
   createdAt!: Date;
   updatedAt!: Date;
 }

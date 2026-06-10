@@ -12,6 +12,8 @@ import { CloudFrontService } from './storage/cloudfront.service';
 import { MediaProcessorService } from './processor/media-processor.service';
 import { SnowflakeIdService } from './snowflake.service';
 import { OutboxEvent, OutboxSchema } from './outbox/outbox.schema';
+import { MediaOutBoxWorker } from './outbox/media-outbox.worker';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
@@ -58,6 +60,7 @@ import { OutboxEvent, OutboxSchema } from './outbox/outbox.schema';
         inject: [ConfigService],
       },
     ]),
+    ScheduleModule.forRoot(), // สําหรับ Cron
   ],
   controllers: [MediaController, MediaProcessorController],
   providers: [
@@ -66,6 +69,7 @@ import { OutboxEvent, OutboxSchema } from './outbox/outbox.schema';
     CloudFrontService,
     MediaProcessorService,
     SnowflakeIdService,
+    MediaOutBoxWorker,
   ],
 })
 export class MediaServiceModule {}
