@@ -14,7 +14,7 @@ import { LikeAggregatorService } from './like-aggregator.service';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({ isGlobal: true, expandVariables: true }), // expandVariables เพื่อให้ nest อ่านค่า ${} ใน env ได้
     ScheduleModule.forRoot(),
 
     MongooseModule.forRootAsync({
@@ -61,6 +61,7 @@ import { LikeAggregatorService } from './like-aggregator.service';
         new Redis({
           host: configService.get('REDIS_HOST', 'localhost'),
           port: configService.get('REDIS_PORT', 6379),
+          password: configService.get<string>('REDIS_PASSWORD'),
         }),
       inject: [ConfigService],
     },

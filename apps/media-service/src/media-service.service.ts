@@ -220,6 +220,7 @@ export class MediaService implements OnModuleInit {
       purpose: updatedMedia.purpose,
     });
 
+    // ต้องทํา outbox pattern ทุก service ที่มีการ emit
     this.kafkaClient.emit('media_events', {
       key: mediaId,
       value: encodedPayload,

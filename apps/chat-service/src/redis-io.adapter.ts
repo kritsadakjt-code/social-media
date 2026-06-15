@@ -15,11 +15,12 @@ export class RedisIoAdapter extends IoAdapter {
 
   async connectToRedis(): Promise<void> {
     const configService = this.app.get(ConfigService);
-    const redisUrl =
-      configService.get<string>('REDIS_URL') || 'redis://localhost:6379';
-
     // เป็นการสร้างท่อเชื่อม redis เเละเตรียมส่งข้อมูลให้ redis
-    const pubClient = new Redis(redisUrl);
+    const pubClient = new Redis({
+      host: configService.get<string>('REDIS_HOST') || 'localhost',
+      port: configService.get<number>('REDIS_PORT') || 6379,
+      password: configService.get<string>('REDIS_PASSWORD'),
+    });
     // ผูกกับ client เเละรอรับข้อมูลที่มาจาก redis
     const subClient = pubClient.duplicate();
 
@@ -33,7 +34,7 @@ export class RedisIoAdapter extends IoAdapter {
     await new Promise<void>((resolve) => pubClient.once('ready', resolve));
     await new Promise<void>((resolve) => subClient.once('ready', resolve));
 
-    this.logger.log(`✅ Connected to Redis Adapter at ${redisUrl}`);
+    this.logger.log(`✅ Connected to Redis Adapter`);
 
     this.adapterConstructor = createAdapter(pubClient, subClient, {
       key: 'chat_socket_adapter',

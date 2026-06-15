@@ -9,10 +9,7 @@ async function bootstrap() {
 
   const configService = app.get(ConfigService);
 
-  const rabbitUrl = configService.get<string>(
-    'RABBITMQ_URL',
-    'amqp://localhost:5672',
-  );
+  const rabbitUrl = configService.getOrThrow<string>('RABBITMQ_URL');
   const postServicePort = configService.get<number>('POST_SERVICE_PORT', 3002);
   const postServiceHost = configService.get<string>(
     'POST_SERVICE_HOST',
