@@ -29,7 +29,7 @@ export class MediaProcessorService {
   async processImage(key: string, mediaId: string): Promise<ProcessedUrls> {
     this.logger.log(`🖼️ กำลัง process รูปภาพ: ${key}`);
 
-    // ดาวน์โหลดจาก S3
+    // ดาวน์โหลดจาก S3 ควรใช้วิธี Stream ส่งข้อมูลเป็นท่อไหลเข้ามาให้ Sharp ทีละนิด
     const buffer = await this.s3Service.downloadFile(key);
 
     const shard = createHash('sha256')
@@ -53,7 +53,7 @@ export class MediaProcessorService {
         .webp({ quality: 80 })
         .toBuffer(),
 
-      // Original — แค่ compress สําหรับดูรูปเต็ม
+      // Original บีบอัด 85% ช่วยลดขนาดไฟล์ได้ 30-50%
       sharp(buffer).webp({ quality: 85 }).toBuffer(),
     ]);
 
@@ -78,12 +78,15 @@ export class MediaProcessorService {
   async processVideo(key: string, mediaId: string): Promise<ProcessedUrls> {
     this.logger.log(`🎥 กำลัง process วิดีโอ: ${key}`);
 
-    // ดาวน์โหลดมาเก็บไว้ใน temp ก่อน เพราะ FFmpeg ต้องการไฟล์จริง
+    // ดาวน์โหลดมาเก็บไว้ใน temp ของ server ก่อน เพราะ FFmpeg ต้องการไฟล์จริง
     const buffer = await this.s3Service.downloadFile(key);
+    // สร้าง folder เเละสุ่มตัวอักษร 6 ตัวต่อท้ายเพื่อไม่ให้ folder ซํ้า
     const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'media-'));
+    // full path
     const inputPath = path.join(tmpDir, 'input.mp4');
-
+    // เขียน buffer ที่โหลดมา ทับลงใน input.mp4
     await fs.writeFile(inputPath, buffer);
+
     this.logger.log(`🎥 กำลัง process วิดีโอ: ${key}`);
     const shard = createHash('sha256')
       .update(mediaId)
@@ -91,6 +94,7 @@ export class MediaProcessorService {
       .slice(0, 2);
 
     const basePath = `processed/${shard}/${mediaId}`;
+
     const qualities = [
       { name: 'p360', height: 360 },
       { name: 'p720', height: 720 },
@@ -99,8 +103,9 @@ export class MediaProcessorService {
 
     const urls: Record<string, string> = {};
 
-    // transcode ทีละ quality
+    // transcode ทีละ quality เพราะใช้ cpu สูง ไม่เหมือนกับ image
     for (const quality of qualities) {
+      // สร้างไฟล์ใหม่หลังจากเเปลงเเล้ว
       const outputPath = path.join(tmpDir, `${quality.name}.mp4`);
       const outputKey = `${basePath}/${quality.name}.mp4`;
 
@@ -154,6 +159,7 @@ export class MediaProcessorService {
           this.logger.log(`✅ แปลงวิดีโอขนาด ${height}p เสร็จสมบูรณ์!`);
           resolve();
         })
+        // ต้องใส่ stdout ถึงเเม้จะไม่ได้ใช้เพราะ ffmpeg ต้องการให้ครับ stdout ใช้ร่วมกับ pipe
         .on('error', (err, stdout, stderr) => {
           this.logger.error(
             `❌ FFmpeg พังตอนแปลงขนาด ${height}p: ${err.message}`,
