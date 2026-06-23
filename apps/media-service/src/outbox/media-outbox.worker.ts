@@ -5,6 +5,7 @@ import { Model } from 'mongoose';
 import { ClientKafka } from '@nestjs/microservices';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { firstValueFrom } from 'rxjs';
+import { calculateBackoff } from '../utils/backoff.util';
 
 @Injectable()
 export class MediaOutBoxWorker implements OnModuleInit {
@@ -81,7 +82,7 @@ export class MediaOutBoxWorker implements OnModuleInit {
       } catch (error) {
         const err = error as Error;
         const nextAttempts = event.attempts + 1;
-        const nextRetryAt = this.calculateBackoff(event.attempts);
+        const nextRetryAt = calculateBackoff(event.attempts);
         await this.outboxModel.updateOne(
           { _id: event._id },
           {
@@ -146,14 +147,14 @@ export class MediaOutBoxWorker implements OnModuleInit {
   }
 
   // ใช้ jitter กระจายเวลาเพื่อไม่ให้ event เวลาใกล้กันเกินไปจะทําให้ server overload
-  private calculateBackoff(attempts: number): Date {
-    const maxDelayMs = 5 * 60 * 1000; // 5m = 300000ms
-    // 1s 2s 4s 8s 16s ... 5m
-    const baseDelayMs = Math.min(1000 * 2 ** attempts, maxDelayMs);
-    // กระจาย 30% ของเวลาที่ delay
-    const jitterMs = Math.random() * 0.3 * baseDelayMs;
-    return new Date(Date.now() + baseDelayMs + jitterMs);
-  }
+  // private calculateBackoff(attempts: number): Date {
+  //   const maxDelayMs = 5 * 60 * 1000; // 5m = 300000ms
+  //   // 1s 2s 4s 8s 16s ... 5m
+  //   const baseDelayMs = Math.min(1000 * 2 ** attempts, maxDelayMs);
+  //   // กระจาย 30% ของเวลาที่ delay
+  //   const jitterMs = Math.random() * 0.3 * baseDelayMs;
+  //   return new Date(Date.now() + baseDelayMs + jitterMs);
+  // }
 
   // เเปลง BSON Binary จาก mongo เป็น buffer ก่อนส่งให้ kafka เพราะ buffer ใน mongo ถูกเก็บเป็น binary
   private normalizeOutboxValue(event: OutboxDocument) {

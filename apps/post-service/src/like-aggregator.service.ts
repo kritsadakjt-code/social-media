@@ -96,6 +96,7 @@ export class LikeAggregatorService implements OnModuleInit {
 
     // update ลง db ทั้งหมด
     if (bulkOps.length > 0) {
+      // ordered: false อัปเดตเเบบขนาน อัปพร้อมกันใครพังค่อย err ออกมา, defualt = true อัปเดตเเบบเป็นลําดับ post a,b,c ถ้า a พัง b,c ไม่ทําต่อ
       await this.postModel.bulkWrite(bulkOps, { ordered: false });
     }
   }
