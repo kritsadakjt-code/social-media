@@ -1,23 +1,37 @@
 import mongoose, { Model } from 'mongoose';
-import { PostService } from '../post-service.service';
+import type { PostService } from '../post-service.service';
 import { Post } from '../post.schema';
 import { Test, TestingModule } from '@nestjs/testing';
-import { GenericContainer, StartedTestContainer, Wait } from 'testcontainers';
+import {
+  GenericContainer,
+  Network,
+  StartedNetwork,
+  StartedTestContainer,
+  Wait,
+} from 'testcontainers';
 import {
   MongoDBContainer,
   StartedMongoDBContainer,
 } from '@testcontainers/mongodb';
 import { KafkaContainer, StartedKafkaContainer } from '@testcontainers/kafka';
 import { Kafka } from 'kafkajs';
-import { SchemaRegistry } from '@kafkajs/confluent-schema-registry';
-import { PostServiceModule } from '../post-service.module';
+import { SchemaRegistry, SchemaType } from '@kafkajs/confluent-schema-registry';
 import { ConfigService } from '@nestjs/config';
 import { getModelToken } from '@nestjs/mongoose';
 import {
   createSpyConsumer,
+  ensureTopic,
   sleep,
   waitForCondition,
 } from './kafka-test.helpers';
+import { createRequire } from 'node:module';
+import { randomUUID } from 'crypto';
+// สําหรับ ใน it ไม่ใช้ barrel export จาก @app/shared เพราะ registry .env จะถูกโหลดเข้ามาก่อนทําให้ได้ค่า host port เดิม
+import { PostCreatedSchema } from '@app/shared/kafka/schemas/posts/created-post.schema';
+import { MediaProcessedSchema } from '@app/shared/kafka/schemas/media/media-processed.schema';
+import { PostCommentedPayload } from '@app/shared/interfaces-events/posts/post-commented.interface';
+
+const testRequire = createRequire(__filename);
 
 interface PostCreatedPayload {
   postId: string;
@@ -27,6 +41,7 @@ interface PostCreatedPayload {
   imageUrl: string | null;
 }
 
+// ควรเเยกการ set up ต่างๆ กับการเทสออกจากกัน จะได้อ่านง่าย focus ไปที่ test case
 jest.setTimeout(60000);
 describe('PostService Kafka Integration', () => {
   let service: PostService;
@@ -42,48 +57,79 @@ describe('PostService Kafka Integration', () => {
   let registry: SchemaRegistry;
   let schemaRegistryUrl: string;
 
+  let network: StartedNetwork;
+  let kafkaBroker: string;
+  let mongoUri: string;
+
   beforeAll(async () => {
-    [kafkaContainer, mongoContainer] = await Promise.all([
-      new KafkaContainer('confluentinc/cp-kafka:8.2.0')
-        .withKraft()
-        .withExposedPorts(9093)
-        .start(),
-      new MongoDBContainer('mongo:6.0').start(),
-    ]);
+    network = await new Network().start();
+
+    console.time('mongo');
+    mongoContainer = await new MongoDBContainer('mongo:6.0').start();
+    // container random host port ของ mongo เพื่อให้ host port ข้างนอกต่อเข้ามาโดย port ไม่ซํ้ากัน
+    mongoUri = `mongodb://127.0.0.1:${mongoContainer.getMappedPort(
+      27017,
+    )}/post-service-test?directConnection=true`; // ต่อตรงเลยเพราะเป็น single node ไม่ได้ทํา replica set
+    console.timeEnd('mongo');
+
+    console.time('kafka');
+    kafkaContainer = await new KafkaContainer('confluentinc/cp-kafka:8.2.0')
+      .withKraft()
+      .withNetwork(network)
+      .withNetworkAliases('kafka')
+      .withExposedPorts(9093) // สําหรับข้างนอกต่อเข้ามาใน container
+      .start();
+    console.timeEnd('kafka');
 
     // ถ้ามี library ช่วย
     // schemaRegistryContainer = await new SchemaRegistryContainer()
     //   .withKafka(kafkaContainer)
     //   .start();
-
+    console.time('schema-registry');
     // สร้าง Schema Registry เองสําหรับ test in docker เเละรอ kafka
     schemaRegistryContainer = await new GenericContainer(
       'confluentinc/cp-schema-registry:8.2.0',
     )
+      .withNetwork(network)
       .withEnvironment({
-        SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: `${kafkaContainer.getHost()}:${kafkaContainer.getMappedPort(9093)}`,
+        SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: 'PLAINTEXT://kafka:9092',
         SCHEMA_REGISTRY_HOST_NAME: 'schema-registry',
         SCHEMA_REGISTRY_LISTENERS: 'http://0.0.0.0:8081',
       })
-      .withExposedPorts(8081)
+      .withExposedPorts(8081) // สําหรับ client ต่อเข้ามาจากข้างนอก
       .withWaitStrategy(
         Wait.forHttp('/subjects', 8081)
           .forStatusCode(200)
-          .withStartupTimeout(60000),
+          .withStartupTimeout(60000), // เช็คความพร้อม 60 วิถ้าเกิน timeout
       )
       .start();
-
+    console.timeEnd('schema-registry');
+    kafkaBroker = `${kafkaContainer.getHost()}:${kafkaContainer.getMappedPort(9093)}`;
     // สร้าง kafka client สําหรับส่ง/รับ ใน test
     kafka = new Kafka({
-      brokers: [
-        `${kafkaContainer.getHost()}:${kafkaContainer.getMappedPort(9093)}`,
-      ],
+      brokers: [kafkaBroker],
       clientId: 'test-client',
     });
 
     schemaRegistryUrl = `http://${schemaRegistryContainer.getHost()}:${schemaRegistryContainer.getMappedPort(8081)}`;
+    // ให้ .env = url ใหม่สําหรับ test เพราะ code จริงมีการดึงค่าจาก .env มาใช้เพื่อต่อเข้า schema registry ใน container
+    // *ถ้าเคยถูกโหลดตั้งเเต่ต้นเเล้วจะไม่โหลดอีก เช่น  schemaRegistryUrl ถูกโหลดจาก lib/share เเล้ว
+    process.env.SCHEMA_REGISTRY_URL = schemaRegistryUrl;
+
+    // โหลด module ตอน runtime เพราะจะได้ค่า .env ล่าสุดมา
+    const { PostServiceModule } = testRequire(
+      '../post-service.module',
+    ) as typeof import('../post-service.module');
+
+    const { PostService } = testRequire(
+      '../post-service.service',
+    ) as typeof import('../post-service.service');
+
     // registry client สําหรับ encode/decode avro
     registry = new SchemaRegistry({ host: schemaRegistryUrl });
+
+    // ทุกเทสใช้ topic นี้เหมือนกัน
+    await ensureTopic(kafka, 'post_events');
 
     module = await Test.createTestingModule({
       imports: [
@@ -113,12 +159,12 @@ describe('PostService Kafka Integration', () => {
     await sleep(2000);
   });
 
-  // ต่อไปที่ container โดยตรงเลย
+  // ต่อไปที่ container โดยตรงเลยไม่ต้องอ่านค่าจาก .env
   function configMap(key: string): string | number | undefined {
     const configs: Record<string, string | number> = {
-      POST_MONGO_URI: mongoContainer.getConnectionString(),
+      POST_MONGO_URI: mongoUri,
 
-      KAFKA_BROKER: `${kafkaContainer.getHost()}:${kafkaContainer.getMappedPort(9093)}`,
+      KAFKA_BROKER: kafkaBroker,
 
       SCHEMA_REGISTRY_URL: schemaRegistryUrl,
 
@@ -133,17 +179,49 @@ describe('PostService Kafka Integration', () => {
   }
 
   afterEach(async () => {
-    await postModel.deleteMany({});
+    if (postModel) {
+      await postModel.deleteMany({});
+    }
   });
 
   afterAll(async () => {
-    await module.close();
-    await mongoose.disconnect();
-    await Promise.all([
-      kafkaContainer.stop(),
-      schemaRegistryContainer.stop(),
-      mongoContainer.stop(),
+    if (module) {
+      await module.close().catch((err) => {
+        console.warn('⚠️ Warning: Failed to close NestJS Module:', err);
+      });
+    }
+    // .catch ถ้าระหว่างขั้นตอนการปิดของ mongo เกิด err เเจ้ง err ,ถ้าไม่มี .catch เเล้วระหว่างปิดพัง จะทําให้การ test fail ทั้งๆ ที่เทสผ่านเเล้ว
+    await mongoose.disconnect().catch((err) => {
+      console.warn('⚠️ Warning: Failed to disconnect MongoDB:', err);
+    });
+
+    // ถ้ามีบางตัว err ก็สั่งให้ทํางานจนเสร็จไม่ว่าจะ success/err เพราะต้องการ clean up ข้อมูลครบทุกตัว
+    const results = await Promise.allSettled([
+      kafkaContainer?.stop(),
+      schemaRegistryContainer?.stop(),
+      mongoContainer?.stop(),
+      // network?.stop(),
     ]);
+    // ถ้ามี err
+    results.forEach((result, index) => {
+      if (result.status === 'rejected') {
+        // ทําเเบบนี้เพราะ ดึงชื่อตรงๆ ออกมาไม่ได้เพราะ allSettled return ออกมาเป็น array
+        const resourceName = [
+          'kafkaContainer',
+          'schemaRegistryContainer',
+          'mongoContainer',
+          // 'network',
+        ][index];
+        console.warn(
+          `⚠️ Warning: Failed to stop ${resourceName} cleanly:`,
+          result.reason,
+        );
+      }
+    });
+
+    await network?.stop().catch((error) => {
+      console.warn('⚠️ Warning: Failed to stop network cleanly:', error);
+    });
   });
 
   describe('Producer', () => {
@@ -152,7 +230,7 @@ describe('PostService Kafka Integration', () => {
       const spy = await createSpyConsumer(
         kafka,
         'post_events',
-        'test-spy-created',
+        `test-group-${randomUUID()}`,
       );
 
       // สร้าง post
@@ -166,17 +244,17 @@ describe('PostService Kafka Integration', () => {
       await waitForCondition(() => Promise.resolve(spy.messages.length > 0));
 
       // chk topic
-      const msg = spy.messages[0];
-      expect(msg.message.headers?.['event_type']?.toString()).toBe(
-        'post_created',
+      const msg = spy.messages.find(
+        (m) => m.message.headers?.['event_type']?.toString() === 'post_created',
       );
+      expect(msg).toBeDefined();
 
       // เพื่อเช็คว่า key นี้ถูกส่งผ่าน kafka มั้ย, key=postId ถูกใช้เพื่อ กําหนดว่าอยู่ partition ไหน
-      expect(msg.message.key?.toString()).toBe(post._id.toString());
+      expect(msg!.message.key?.toString()).toBe(post._id.toString());
 
       // chk value
       const decoded = (await registry.decode(
-        msg.message.value as Buffer,
+        msg!.message.value as Buffer,
       )) as PostCreatedPayload;
       expect(decoded.postId).toBe(post._id.toString());
       expect(decoded.authorId).toBe('user_001');
@@ -184,6 +262,107 @@ describe('PostService Kafka Integration', () => {
       expect(decoded.timestamp).toBeDefined();
 
       await spy.stop();
+    });
+
+    it('should throw when encoding payload with wrong field type', async () => {
+      const schemaId = (
+        await registry.register({
+          type: SchemaType.AVRO,
+          schema: JSON.stringify(PostCreatedSchema),
+        })
+      ).id;
+
+      const invalidPayload: Record<string, unknown> = {
+        postId: '123',
+        // ขาด authorId ผิด Schema
+        content: 12345, // ต้องเป็น string แต่ส่ง number
+        timestamp: new Date().toISOString(),
+      };
+
+      await expect(async () => {
+        // encode ข้อมูลที่ผิด
+        await registry.encode(schemaId, invalidPayload);
+      }).rejects.toThrow();
+    });
+
+    it('should emit post_commented event when addComment is called', async () => {
+      const spy = await createSpyConsumer(
+        kafka,
+        'post_events',
+        `test-group-${randomUUID()}`,
+      );
+
+      const post = await service.createPost({
+        userId: 'u1',
+        username: 'user1',
+        content: 'hello',
+      });
+
+      await service.addComment({
+        postId: post._id.toString(),
+        userId: 'u2',
+        username: 'user2',
+        content: 'Nice post!',
+      });
+
+      await waitForCondition(() => Promise.resolve(spy.messages.length > 1)); // > 1 เพราะมี post_created มาก่อน
+
+      const commentMsg = spy.messages.find(
+        (m) =>
+          m.message.headers?.['event_type']?.toString() === 'post_commented',
+      );
+      expect(commentMsg).toBeDefined();
+
+      const decoded = (await registry.decode(
+        commentMsg!.message.value as Buffer,
+      )) as PostCommentedPayload;
+      expect(decoded.postId).toBe(post._id.toString());
+      expect(decoded.commenterId).toBe('u2');
+      expect(decoded.content).toBe('Nice post!');
+
+      await spy.stop();
+    });
+  });
+
+  describe('Consumer', () => {
+    it('should update post mediaStatus to completed when handleMediaProcessed is called', async () => {
+      // มาจาก media-service
+      const schemaId = (
+        await registry.register({
+          type: SchemaType.AVRO,
+          schema: JSON.stringify(MediaProcessedSchema),
+        })
+      ).id;
+
+      const mockMediaId = 'media-12345';
+      const post = await service.createPost({
+        userId: 'u1',
+        username: 'user1',
+        content: 'Pic',
+        mediaId: mockMediaId,
+      });
+
+      // จำลอง Payload ที่ส่งมาจาก Media Service
+      const mockPayload = {
+        mediaId: mockMediaId,
+        userId: 'u1',
+        purpose: 'post',
+        originalUrl: '...',
+        mediumUrl: 'https://aws.s3.com/medium.jpg',
+        p720Url: 'https://aws.s3.com/720p.mp4',
+        status: 'completed',
+        timestamp: new Date().toISOString(),
+      };
+
+      // media-service encode -> post-service
+      const encodedBuffer = await registry.encode(schemaId, mockPayload);
+
+      // post handler -> post service
+      await service.handleMediaProcessed(encodedBuffer);
+
+      const updatedPost = await postModel.findById(post._id);
+      expect(updatedPost?.mediaStatus).toBe('completed');
+      expect(updatedPost?.imageUrl).toBe('https://aws.s3.com/medium.jpg');
     });
   });
 });

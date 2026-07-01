@@ -17,25 +17,30 @@ export async function createSpyConsumer(
 
   // สร้าง consumer
   const consumer = kafka.consumer({ groupId });
-  // ต่อ consumer เข้า kafka broker
-  await consumer.connect();
-  await consumer.subscribe({ topic, fromBeginning: true }); // เริ่มอ่านตั้งเเต่ message , ถ้า false อ่าน message หลัง subscribe
+  try {
+    // ต่อ consumer เข้า kafka broker
+    await consumer.connect();
+    await consumer.subscribe({ topic, fromBeginning: true }); // เริ่มอ่านตั้งเเต่ message , ถ้า false อ่าน message หลัง subscribe
 
-  // ฟัง message ที่ kafka ส่งมาเเละเก็บลง array
-  void consumer.run({
-    eachMessage: (payload) => {
-      messages.push(payload);
-      return Promise.resolve();
-    },
-  });
+    // ฟัง message ที่ kafka ส่งมาเเละเก็บลง array
+    void consumer.run({
+      eachMessage: (payload) => {
+        messages.push(payload);
+        return Promise.resolve();
+      },
+    });
 
-  return {
-    consumer,
-    messages,
-    stop: async () => {
-      await consumer.disconnect();
-    },
-  };
+    return {
+      consumer,
+      messages,
+      stop: async () => {
+        await consumer.disconnect();
+      },
+    };
+  } catch (error) {
+    await consumer.disconnect().catch(() => undefined);
+    throw error;
+  }
 }
 
 // รอ consumer ได้รับ message หรือยัง
@@ -55,6 +60,31 @@ export async function waitForCondition(
   throw new Error(`waitForCondition: timeout after ${timeoutMs}ms`);
 }
 
+// สร้าง topic ไว้ก่อนดักฟัง
+export async function ensureTopic(kafka: Kafka, topic: string) {
+  const admin = kafka.admin();
+  await admin.connect();
+
+  try {
+    // เช็คเคยสร้างหรือยัง
+    const topics = await admin.listTopics();
+    if (!topics.includes(topic)) {
+      await admin.createTopics({
+        waitForLeaders: true,
+        topics: [
+          {
+            topic,
+            numPartitions: 1,
+            replicationFactor: 1,
+          },
+        ],
+      });
+    }
+  } finally {
+    await admin.disconnect();
+  }
+}
+
 // ─────────────────────────────────────────────────────────────
 //
 //  Kafka Test Helpers
@@ -63,13 +93,6 @@ export async function waitForCondition(
 // ─────────────────────────────────────────────────────────────
 
 // import { Kafka, Consumer, Producer, EachMessagePayload } from 'kafkajs';
-
-// // รอจนกว่า condition จะเป็น true หรือ timeout
-// // ใช้สำหรับรอ Consumer รับ message แบบ async
-
-// export function sleep(ms: number): Promise<void> {
-//   return new Promise(resolve => setTimeout(resolve, ms));
-// }
 
 // // สร้าง Spy Consumer สำหรับดักฟัง message ที่ถูกส่งเข้า Kafka
 // // ใช้ใน Producer test เพื่อตรวจว่า message ถูกส่งถูกต้องมั้ย
