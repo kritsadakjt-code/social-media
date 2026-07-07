@@ -8,7 +8,8 @@ async function bootstrap() {
 
   const configService = app.get(ConfigService);
 
-  const notiPort = configService.get<string>('NOTI_SERVICE_PORT') || 3004;
+  const notiPort =
+    configService.get<string>('NOTI_SERVICE_SOCKET_PORT') || 3002;
 
   const kafkaBroker =
     configService.get<string>('KAFKA_BROKER') || 'localhost:9092';

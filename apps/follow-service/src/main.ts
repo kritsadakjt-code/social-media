@@ -10,7 +10,7 @@ async function bootstrap() {
   const configService = app.get(ConfigService);
 
   const host = configService.get<string>('FOLLOW_SERVICE_HOST', '127.0.0.1');
-  const port = configService.get<number>('FOLLOW_SERVICE_PORT', 3003);
+  const port = configService.get<number>('FOLLOW_SERVICE_PORT', 50053);
 
   const kafkaBroker =
     configService.get<string>('KAFKA_BROKER') || 'localhost:9092';
@@ -39,6 +39,6 @@ async function bootstrap() {
   await app.startAllMicroservices();
 
   await app.init();
-  console.log('🚀 Follow Microservice is listening on gRPC (Port 3003)');
+  console.log('🚀 Follow Microservice is listening on gRPC (Port 50053)');
 }
 bootstrap();

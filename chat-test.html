@@ -42,7 +42,7 @@
         const token = document.getElementById('tokenInput').value;
 
         // 🌟 1. เชื่อมต่อไปที่ Chat Service + Namespace /chat พร้อมแนบ Token
-        socket = io('http://localhost:50053/chat', {
+        socket = io('http://localhost:3001/chat', {
           auth: { token: token },
         });
 

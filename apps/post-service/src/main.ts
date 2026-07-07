@@ -10,7 +10,7 @@ async function bootstrap() {
   const configService = app.get(ConfigService);
 
   const rabbitUrl = configService.getOrThrow<string>('RABBITMQ_URL');
-  const postServicePort = configService.get<number>('POST_SERVICE_PORT', 3002);
+  const postServicePort = configService.get<number>('POST_SERVICE_PORT', 50052);
   const postServiceHost = configService.get<string>(
     'POST_SERVICE_HOST',
     '127.0.0.1',
@@ -37,7 +37,7 @@ async function bootstrap() {
     options: {
       package: 'post',
       protoPath: join(process.cwd(), 'libs/shared/src/proto/post.proto'),
-      url: `${postServiceHost}:${postServicePort}`, // ใช้ Port 3002 จะได้ไม่ชนกับ User Service (3001)
+      url: `${postServiceHost}:${postServicePort}`, // ใช้ Port 50052 จะได้ไม่ชนกับ User Service (50051)
     },
   });
 

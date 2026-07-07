@@ -16,7 +16,7 @@ import { UsersService } from './users.service';
           options: {
             package: 'user',
             protoPath: join(process.cwd(), 'libs/shared/src/proto/user.proto'),
-            url: `${configService.get<string>('USER_SERVICE_HOST') || '127.0.0.1'}:${configService.get<number>('USER_SERVICE_PORT') || 3001}`,
+            url: `${configService.get<string>('USER_SERVICE_HOST') || '127.0.0.1'}:${configService.get<number>('USER_SERVICE_PORT') || 50051}`,
           },
         }),
         inject: [ConfigService],

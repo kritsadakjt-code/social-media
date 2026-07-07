@@ -10,7 +10,7 @@ async function bootstrap() {
   const configService = app.get(ConfigService);
 
   const host = configService.get<string>('USER_SERVICE_HOST', '127.0.0.1');
-  const port = configService.get<number>('USER_SERVICE_PORT', 3001);
+  const port = configService.get<number>('USER_SERVICE_PORT', 50051);
 
   app.connectMicroservice<MicroserviceOptions>({
     transport: Transport.GRPC,
@@ -22,6 +22,6 @@ async function bootstrap() {
   });
 
   await app.startAllMicroservices();
-  console.log('🚀 User Microservice is listening on GRPC port 3001');
+  console.log('🚀 User Microservice is listening on GRPC port 50051');
 }
 bootstrap();
