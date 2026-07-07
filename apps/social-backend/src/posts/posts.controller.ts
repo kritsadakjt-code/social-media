@@ -21,7 +21,7 @@ import { CreateCommentDto } from '@app/shared/dto/posts/create-comment.dto';
 
 import type { RequestWithUser } from '../interfaces/request.interface';
 import { PostsService } from './posts.service';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 
 @ApiTags('Posts')
 @Controller('posts')
@@ -91,7 +91,7 @@ export class PostsController {
     return this.postsService.likePost(
       postId,
       req.user.userId,
-      idempotencyKey ?? uuidv4(),
+      idempotencyKey ?? randomUUID(),
     );
   }
 
