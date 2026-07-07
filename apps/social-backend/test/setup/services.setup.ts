@@ -23,9 +23,9 @@ export function createConfigMap(infra: Infrastructure) {
       POST_MONGO_URI: infra.mongoUri,
       USER_MONGO_URI: infra.mongoUri,
       USER_SERVICE_HOST: 'localhost',
-      USER_SERVICE_PORT: 3001,
+      USER_SERVICE_PORT: 50051,
       POST_SERVICE_HOST: 'localhost',
-      POST_SERVICE_PORT: 3002,
+      POST_SERVICE_PORT: 50052,
       RABBITMQ_URL: infra.rabbitmqUrl,
       KAFKA_BROKER: infra.kafkaBroker,
       REDIS_HOST: infra.redisHost,
@@ -61,7 +61,7 @@ export async function startServices(infra: Infrastructure): Promise<Services> {
         __dirname,
         '../../../../libs/shared/src/proto/user.proto',
       ),
-      url: '0.0.0.0:3001',
+      url: '0.0.0.0:50051',
     },
   });
 
@@ -89,7 +89,7 @@ export async function startServices(infra: Infrastructure): Promise<Services> {
         __dirname,
         '../../../../libs/shared/src/proto/post.proto',
       ),
-      url: '0.0.0.0:3002',
+      url: '0.0.0.0:50052',
     },
   });
   postApp.connectMicroservice<MicroserviceOptions>({

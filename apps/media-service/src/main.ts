@@ -9,7 +9,7 @@ async function bootstrap() {
   const configService = app.get(ConfigService);
 
   const host = configService.get<string>('MEDIA_SERVICE_HOST', '0.0.0.0');
-  const grpcPort = configService.get<number>('MEDIA_SERVICE_PORT', 3006);
+  const grpcPort = configService.get<number>('MEDIA_SERVICE_PORT', 50055);
   const kafkaBroker = configService.getOrThrow<string>('KAFKA_BROKER');
 
   app.connectMicroservice<MicroserviceOptions>({

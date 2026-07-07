@@ -10,10 +10,10 @@ async function bootstrap() {
   const configService = app.get(ConfigService);
 
   const host = configService.get<string>('CHAT_SERVICE_HOST', '0.0.0.0');
-  const grpcPort = configService.get<number>('CHAT_SERVICE_PORT', 3005);
+  const grpcPort = configService.get<number>('CHAT_SERVICE_PORT', 50054);
   const socketPort = configService.get<number>(
     'CHAT_SERVICE_SOCKET_PORT',
-    50053,
+    3001,
   );
 
   // เปิดใช้งาน redis adapter สำหรับ WebSockets
