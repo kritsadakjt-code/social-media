@@ -218,7 +218,7 @@ describe('LikeThrottleService', () => {
     });
   });
 
-  describe('full flow integration', () => {
+  describe('full flow ', () => {
     it('should track → notify → count → clear on first like', async () => {
       redisMock.sadd.mockResolvedValue(1);
       redisMock.expire.mockResolvedValue(1);
