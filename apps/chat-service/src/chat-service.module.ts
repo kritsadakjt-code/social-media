@@ -14,7 +14,7 @@ import { JwtModule } from '@nestjs/jwt';
     MongooseModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
-        uri: configService.get<string>('CHAT_MONGO_URI'),
+        uri: configService.getOrThrow<string>('CHAT_MONGO_URI'),
       }),
       inject: [ConfigService],
     }),
@@ -24,7 +24,7 @@ import { JwtModule } from '@nestjs/jwt';
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_SECRET'),
+        secret: configService.getOrThrow<string>('JWT_SECRET'),
       }),
       inject: [ConfigService],
     }),

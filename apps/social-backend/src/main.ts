@@ -9,7 +9,7 @@ import helmet from 'helmet';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // ตั้งค่าความปลอดถัยพื้นฐาน
+  // ตั้งค่าความปลอดภัยพื้นฐาน
   app.use(helmet());
 
   app.enableCors({

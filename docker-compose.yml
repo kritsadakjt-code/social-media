@@ -4,47 +4,128 @@ services:
   mongodb:
     image: mongo:6.0
     container_name: social_mongodb
-    ports: ['27018:27017']
+    # ผูกกับ localhost
+    ports:
+      - '127.0.0.1:27018:27017'
     environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: password123
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
     volumes:
       - mongodb_data:/data/db
+    networks:
+      - backend
+    healthcheck:
+      # check ที่ localhost:27017/test db:test เป็น db เปล่าๆ สําหรับ check เฉยๆ
+      # ping เช็คเพื่อให้ container รู้ว่า service ไหน crash จะได้ restart เลย โดยที่ไม่ต้องรอให้ server มาเจอเอง
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s # เริ่มเช็คหลัง 30วิ รอ mongo start
+    deploy: # ป้องกันบาง service กิน ram เกินไปทําให้ service อื่น crash ไปด้วย
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5' # 0.5 core
+    restart: unless-stopped
 
   redis:
     image: redis:7.0-alpine
     container_name: social_redis
-    ports: ['6379:6379']
+    # appendonly (AOF) เก็บทุกข้อมูลไว้ใน disk, --save (RDB) snapshot ช่วงข้อมูลลงใน disk เเละบีบอัด, ป้องกันระบบ crash เเล้ว data หาย
+    # ต้องมีเพราะตอนระบบ crash เเล้ว restart จะดึงข้อมูลได้เร็วจาก RDB ไปต่อกับ AOF
+    command: | # อนุญาตให้มีหลายบรรทัด
+      redis-server
+      --requirepass ${REDIS_PASSWORD}
+      --appendonly yes 
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+    ports:
+      - '127.0.0.1:6379:6379'
+    environment:
+      REDISCLI_AUTH: ${REDIS_PASSWORD} # ใช้ร่วมกับ healthcheck เพื่อตอน ping ไม่ให้เห็นคําสั่งที่มีรหัสผ่านด้วย
     volumes:
       - redis_data:/data
+    networks:
+      - backend # NestJS ใช้ Redis เป็น Cache
+      - messaging # Message Brokers ใช้ Redis Pub/Sub
+    healthcheck:
+      test: redis-cli ping
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+    restart: unless-stopped
 
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.11.1
     container_name: social_elasticsearch
     environment:
       - discovery.type=single-node
-      - xpack.security.enabled=false
-    ports: ['9200:9200']
+      - xpack.security.enabled=true
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m #เริ่มจองพื้นที่ 512mb สูงสูง 512mb (java heap), ที่เหลือสําหรับ File System Cache โหลดข้อมูลมาไว้ใน ram
+    ports:
+      - '127.0.0.1:9200:9200'
     volumes:
       - es_data:/usr/share/elasticsearch/data
+    networks:
+      - backend
+      - monitoring
+    healthcheck:
+      test: [
+          'CMD-SHELL',
+          'curl -s -u elastic:${ELASTIC_PASSWORD} http://localhost:9200/_cluster/health | grep -q "status":"green\|yellow"', # chk yellow ด้วยเพราะ elastic จะเช็ค replica ด้วย ซึ่งกรณีนี้เราไม่ได้ใช้ถ้าเช็คเเค่ green docker จะคิดว่าระบบ crash เเต่มันไม่ได้ crash
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+    restart: unless-stopped
 
   rabbitmq:
     image: rabbitmq:3.11-management-alpine
     container_name: social_rabbitmq
     ports:
-      - '5672:5672' # port microservice
-      - '15672:15672' # port ui
+      - '127.0.0.1:5672:5672' # port microservice
+      - '127.0.0.1:15672:15672' # port ui
     environment:
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS}
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - messaging
+      - monitoring
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+    restart: unless-stopped
 
   kafka:
     image: confluentinc/cp-kafka:8.2.0
     container_name: social_kafka
     ports:
-      - '9092:9092'
+      - '127.0.0.1:9092:9092'
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: 'broker,controller'
@@ -54,34 +135,89 @@ services:
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT'
       KAFKA_INTER_BROKER_LISTENER_NAME: 'INTERNAL'
       KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
-      CLUSTER_ID: 'MkU3OEVBNTcwNTJENDM2Qk'
+      CLUSTER_ID: ${KAFKA_CLUSTER_ID}
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_HEAP_OPTS: '-Xmx512m -Xms512m'
     volumes:
       - kafka_data:/var/lib/kafka/data
+    networks:
+      - messaging
+      - monitoring
+    healthcheck:
+      test: kafka-topics --bootstrap-server localhost:9092 --list
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+    restart: unless-stopped
 
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
     container_name: social_kafka_ui
     depends_on:
-      - kafka
+      kafka:
+        condition: service_healthy
+      schema-registry:
+        condition: service_healthy
     ports:
-      - '8080:8080'
+      - '127.0.0.1:8080:8080'
     environment:
       KAFKA_CLUSTERS_0_NAME: local
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+      KAFKA_CLUSTERS_0_SCHEMAREGISTRY: http://schema-registry:8081
+      AUTH_TYPE: LOGIN_FORM
+      SPRING_SECURITY_USER_NAME: ${KAFKA_UI_USER}
+      SPRING_SECURITY_USER_PASSWORD: ${KAFKA_UI_PASSWORD}
+    networks:
+      - monitoring
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+    restart: unless-stopped
 
   schema-registry:
     image: confluentinc/cp-schema-registry:8.2.0
     container_name: social_schema_registry
     depends_on:
-      - kafka
+      kafka: # รอจนกว่า kafka จะ start
+        condition: service_healthy
     ports:
-      - '8081:8081'
+      - '127.0.0.1:8081:8081'
     environment:
       SCHEMA_REGISTRY_HOST_NAME: schema-registry
       SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: 'PLAINTEXT://kafka:29092'
+    networks:
+      - messaging
+      - monitoring
+    healthcheck:
+      test: curl -f http://localhost:8081/subjects || exit 1 # chk http status 4xx, 5xx
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+    restart: unless-stopped
+
+networks:
+  backend:
+    driver: bridge
+  messaging:
+    driver: bridge
+  monitoring:
+    driver: bridge
 
 volumes:
   mongodb_data:

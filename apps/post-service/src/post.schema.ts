@@ -1,23 +1,41 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { HydratedDocument } from 'mongoose';
 
 @Schema({ timestamps: true })
-export class Post extends Document {
+export class Post {
   @Prop({ required: true })
-  userId: string;
+  // ใส่ ! ไว้เพราะ TS เตือนว่าตั้งใส่ค่าเริ่มต้น เเต่ส่วนนี้ mongoose จะใส่ค่าให้ตอนที่รัน
+  userId!: string;
 
   @Prop({ required: true })
-  username: string;
+  username!: string;
 
   @Prop({ required: true })
-  content: string;
+  content!: string;
 
   @Prop({ default: 0 })
-  likes: number;
+  likes!: number;
+
+  // media
+  @Prop({ type: String, default: null })
+  mediaId!: string | null;
+
+  @Prop({ type: String, default: null })
+  imageUrl!: string | null;
+
+  @Prop({ type: String, default: null })
+  videoUrl!: string | null;
+
+  @Prop({
+    type: String,
+    enum: ['none', 'processing', 'completed', 'failed'],
+    default: 'none',
+  })
+  mediaStatus!: 'none' | 'processing' | 'completed' | 'failed';
 
   // สร้างไว้เพื่อไม่ให้เเจ้ง unsafe เพราะ ts ไม่รู้จักชื่อนี้ถ้าไม่ประกาศ
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt!: Date;
+  updatedAt!: Date;
 }
-
+export type PostDocument = HydratedDocument<Post>;
 export const PostSchema = SchemaFactory.createForClass(Post);

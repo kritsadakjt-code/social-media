@@ -9,7 +9,7 @@ import { firstValueFrom } from 'rxjs';
 
 @Injectable()
 export class PostsService implements OnModuleInit {
-  private postGrpcService: PostGrpcService;
+  private postGrpcService!: PostGrpcService;
 
   constructor(
     @Inject('POST_SERVICE_RABBITMQ')
@@ -25,8 +25,18 @@ export class PostsService implements OnModuleInit {
     await this.feedKafkaClient.connect();
   }
 
-  createPost(userId: string, username: string, content: string) {
-    this.postRabbitClient.emit('create_post', { userId, username, content });
+  createPost(
+    userId: string,
+    username: string,
+    content: string,
+    mediaId?: string,
+  ) {
+    this.postRabbitClient.emit('create_post', {
+      userId,
+      username,
+      content,
+      mediaId,
+    });
     return { message: 'ระบบกำลังสร้างโพสต์ของคุณอยู่เบื้องหลัง' };
   }
 
@@ -43,15 +53,17 @@ export class PostsService implements OnModuleInit {
     if (!postIds || postIds.length === 0) {
       return { posts: [] };
     }
-    return firstValueFrom(this.postGrpcService.getPostsByIds({ ids: postIds }));
+    return firstValueFrom(
+      this.postGrpcService.getPostsByPostIdsRedis({ ids: postIds }),
+    );
   }
 
   getPostsByUserId(targetUserId: string) {
     return this.postGrpcService.getPostsByUserId({ userId: targetUserId });
   }
 
-  likePost(postId: string, userId: string) {
-    return this.postGrpcService.likePost({ postId, userId });
+  likePost(postId: string, userId: string, idempotencyKey: string) {
+    return this.postGrpcService.likePost({ postId, userId, idempotencyKey });
   }
 
   addComment(

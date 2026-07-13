@@ -13,7 +13,7 @@ import { ClientsModule, Transport } from '@nestjs/microservices';
     MongooseModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
-        uri: configService.get<string>('FOLLOW_MONGO_URI'),
+        uri: configService.getOrThrow<string>('FOLLOW_MONGO_URI'),
       }),
       inject: [ConfigService],
     }),

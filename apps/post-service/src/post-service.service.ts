@@ -5,9 +5,22 @@ import { Model } from 'mongoose';
 import { ClientKafka, RpcException } from '@nestjs/microservices';
 import { status } from '@grpc/grpc-js';
 import { Comment, CommentDocument } from './comment.schema';
+import {
+  MediaProcessedPayload,
+  MediaProcessFailedPayload,
+  PostCreatedSchema,
+  PostLikedSchema,
+  registry,
+} from '@app/shared';
+import { SchemaType } from '@kafkajs/confluent-schema-registry';
+import { PostCommentedSchema } from '@app/shared/kafka/schemas/posts/commented-post.schema';
 
 @Injectable()
 export class PostService implements OnModuleInit {
+  private postCreatedSchemaId!: number;
+  private postLikedSchemaId!: number;
+  private postCommentSchemaId!: number;
+
   constructor(
     @InjectModel(Post.name) private postModel: Model<Post>,
     @InjectModel(Comment.name) private commentModel: Model<CommentDocument>,
@@ -16,26 +29,76 @@ export class PostService implements OnModuleInit {
 
   async onModuleInit() {
     await this.kafkaClient.connect();
+
+    // ไปขอ schemaID เเค่ครั้งเดียวเเละจําไปตลอด ตอน start service เเก้จากที่ต้องยิงเข้ามาทีละครั้ง
+    try {
+      const postCreated = await registry.register({
+        type: SchemaType.AVRO,
+        schema: JSON.stringify(PostCreatedSchema),
+      });
+      this.postCreatedSchemaId = postCreated.id;
+
+      const postLiked = await registry.register({
+        type: SchemaType.AVRO,
+        schema: JSON.stringify(PostLikedSchema),
+      });
+      this.postLikedSchemaId = postLiked.id;
+
+      const postComment = await registry.register({
+        type: SchemaType.AVRO,
+        schema: JSON.stringify(PostCommentedSchema),
+      });
+      this.postCommentSchemaId = postComment.id;
+
+      console.log('✅ โหลด Schema ลง Memory สำเร็จ!');
+    } catch (error) {
+      console.error('❌ โหลด Schema ไม่สำเร็จ:', error);
+    }
   }
 
   async createPost(data: {
     userId: string;
     username: string;
     content: string;
+    mediaId?: string;
   }) {
     const newPost = new this.postModel({
       userId: data.userId,
       username: data.username,
       content: data.content,
+      mediaId: data.mediaId ?? null,
+      mediaStatus: data.mediaId ? 'processing' : 'none',
     });
 
     const savedPost = await newPost.save();
-    this.kafkaClient.emit('post_created', {
+
+    const rawData = {
       postId: savedPost._id.toString(),
       authorId: savedPost.userId,
       content: savedPost.content,
-      timestamp: savedPost.createdAt || new Date().toISOString(),
-    });
+      timestamp: savedPost.createdAt
+        ? new Date(savedPost.createdAt).toISOString()
+        : new Date().toISOString(),
+      // imageUrl: 'https://example.com/my-awesome-photo.jpg',
+      // imageUrl2: 'https://example.com/my-awesome-photo2.jpg',
+    };
+
+    try {
+      const encodedPayload = await registry.encode(
+        this.postCreatedSchemaId,
+        rawData,
+      );
+      this.kafkaClient.emit('post_events', {
+        key: savedPost._id.toString(),
+        value: encodedPayload,
+        headers: {
+          event_type: 'post_created',
+        },
+      });
+      console.log(`✅ ส่งข้อความ Post Created ผ่าน Schema Registry สำเร็จ!`);
+    } catch (error) {
+      console.error('❌ ไม่สามารถส่งข้อความ post_created ได้:', error);
+    }
 
     console.log(`บันทึกโพสต์สำเร็จ (ID: ${savedPost._id.toString()})`);
     return savedPost;
@@ -59,7 +122,7 @@ export class PostService implements OnModuleInit {
     };
   }
 
-  async getPostsByIds(ids: string[]) {
+  async getPostsByPostIdsRedis(ids: string[]) {
     const posts = await this.postModel
       .find({ _id: { $in: ids } })
       .sort({ createdAt: -1 })
@@ -79,9 +142,17 @@ export class PostService implements OnModuleInit {
     };
   }
 
-  async getPostsByUserId(userId: string) {
+  async getPostsByUserId(userId: string): Promise<{ ids: string[] }> {
+    const posts = await this.postModel.find({ userId }).select('_id').exec();
+
+    return {
+      ids: posts.map((post) => post._id.toString()),
+    };
+  }
+
+  async getPostsWithDetailByUserId(userId: string) {
     const posts = await this.postModel
-      .find({ userId: userId })
+      .find({ userId })
       .sort({ createdAt: -1 })
       .exec();
 
@@ -92,43 +163,57 @@ export class PostService implements OnModuleInit {
         username: post.username,
         content: post.content,
         likes: post.likes,
-        createdAt: post.createdAt
-          ? post.createdAt.toISOString()
-          : new Date().toISOString(),
+        createdAt: post.createdAt?.toISOString() ?? new Date().toISOString(),
       })),
     };
   }
 
-  async likePost(postId: string, userId: string) {
-    const updatedPost = await this.postModel.findByIdAndUpdate(
-      postId,
-      { $inc: { likes: 1 } }, //ไป +1
-      { returnDocument: 'after' }, // return ข้อมูลที่เเก้ไข
-    );
-    if (!updatedPost) {
-      throw new RpcException({
-        code: status.NOT_FOUND,
-        message: 'ไม่พบโพสต์นี้ในระบบ',
-      });
-    }
+  // async likePost(postId: string, userId: string) {
+  //   const updatedPost = await this.postModel.findByIdAndUpdate(
+  //     postId,
+  //     { $inc: { likes: 1 } }, //ไป +1
+  //     { returnDocument: 'after' }, // return ข้อมูลที่เเก้ไข
+  //   );
+  //   if (!updatedPost) {
+  //     throw new RpcException({
+  //       code: status.NOT_FOUND,
+  //       message: 'ไม่พบโพสต์นี้ในระบบ',
+  //     });
+  //   }
 
-    this.kafkaClient.emit('post_liked', {
-      postId: updatedPost._id.toString(),
-      postOwnerId: updatedPost.userId, // เจ้าของโพสต์ (คนที่จะโดนแจ้งเตือน)
-      likedByUserId: userId, // คนที่ไปกดไลก์
-      timestamp: new Date().toISOString(),
-    });
+  //   const rawData = {
+  //     postId: updatedPost._id.toString(),
+  //     postOwnerId: updatedPost.userId, // เจ้าของโพสต์ (คนที่จะโดนแจ้งเตือน)
+  //     likedByUserId: userId, // คนที่ไปกดไลก์
+  //     timestamp: new Date().toISOString(),
+  //   };
+  //   try {
+  //     const encodedPayload = await registry.encode(
+  //       this.postLikedSchemaId,
+  //       rawData,
+  //     );
+  //     this.kafkaClient.emit('post_events', {
+  //       key: postId,
+  //       value: encodedPayload,
+  //       headers: {
+  //         event_type: 'post_liked',
+  //       },
+  //     });
+  //     console.log(`✅ ส่งข้อความ Post Liked ผ่าน Schema Registry สำเร็จ!`);
+  //   } catch (error) {
+  //     console.error('❌ ไม่สามารถส่งข้อความ post_liked ได้:', error);
+  //   }
 
-    return {
-      id: updatedPost._id.toString(),
-      userId: updatedPost.userId,
-      username: updatedPost.username,
-      content: updatedPost.content,
-      likes: updatedPost.likes,
-      createdAt:
-        updatedPost.createdAt?.toISOString() || new Date().toISOString(),
-    };
-  }
+  //   return {
+  //     id: updatedPost._id.toString(),
+  //     userId: updatedPost.userId,
+  //     username: updatedPost.username,
+  //     content: updatedPost.content,
+  //     likes: updatedPost.likes,
+  //     createdAt:
+  //       updatedPost.createdAt?.toISOString() || new Date().toISOString(),
+  //   };
+  // }
 
   async addComment(data: {
     postId: string;
@@ -154,14 +239,31 @@ export class PostService implements OnModuleInit {
 
     const savedComment = await newComment.save();
 
-    this.kafkaClient.emit('post_commented', {
+    const rawData = {
       postId: data.postId,
       postOwnerId: post.userId, // เจ้าของโพสต์ (คนที่จะโดนแจ้งเตือน)
       commenterId: data.userId, // คนที่มาคอมเมนต์
       commenterName: data.username,
       content: data.content,
       timestamp: savedComment.createdAt?.toISOString(),
-    });
+    };
+    console.log(this.postCommentSchemaId);
+    try {
+      const encodePayload = await registry.encode(
+        this.postCommentSchemaId,
+        rawData,
+      );
+      this.kafkaClient.emit('post_events', {
+        key: data.postId,
+        value: encodePayload,
+        headers: {
+          event_type: 'post_commented',
+        },
+      });
+      console.log(`✅ ส่งข้อความ Post Comment ผ่าน Schema Registry สำเร็จ!`);
+    } catch (error) {
+      console.error('❌ ไม่สามารถส่งข้อความ post_comment ได้:', error);
+    }
 
     return {
       id: savedComment._id.toString(),
@@ -174,13 +276,13 @@ export class PostService implements OnModuleInit {
   }
 
   async getCommentsByPostId(postId: string) {
-    const comment = await this.commentModel
+    const comments = await this.commentModel
       .find({ postId: postId })
       .sort({ createdAt: 1 })
       .exec();
 
     return {
-      comment: comment.map((c) => ({
+      comments: comments.map((c) => ({
         id: c._id.toString(),
         postId: c.postId,
         userId: c.userId,
@@ -189,5 +291,54 @@ export class PostService implements OnModuleInit {
         createdAt: c.createdAt?.toISOString(),
       })),
     };
+  }
+
+  // process media success
+  async handleMediaProcessed(
+    encodedMessage: Buffer | { value: Buffer | string },
+  ) {
+    const bufferData = Buffer.isBuffer(encodedMessage)
+      ? encodedMessage
+      : Buffer.from(encodedMessage.value || '');
+
+    const payload = (await registry.decode(
+      bufferData,
+    )) as MediaProcessedPayload;
+
+    if (payload.purpose !== 'post') return;
+
+    // update post ที่มี mediaId นี้
+    await this.postModel.findOneAndUpdate(
+      { mediaId: payload.mediaId },
+      {
+        imageUrl: payload.mediumUrl,
+        videoUrl: payload.p720Url,
+        mediaStatus: 'completed',
+      },
+    );
+
+    console.log(`✅ update post media สำเร็จ: ${payload.mediaId}`);
+  }
+
+  // process media failed
+  async handleMediaProcessFailed(
+    encodedMessage: Buffer | { value: Buffer | string },
+  ) {
+    const bufferData = Buffer.isBuffer(encodedMessage)
+      ? encodedMessage
+      : Buffer.from(encodedMessage.value || '');
+
+    const payload = (await registry.decode(
+      bufferData,
+    )) as MediaProcessFailedPayload;
+
+    if (payload.purpose !== 'post') return;
+
+    await this.postModel.findOneAndUpdate(
+      { mediaId: payload.mediaId },
+      {
+        mediaStatus: 'failed',
+      },
+    );
   }
 }

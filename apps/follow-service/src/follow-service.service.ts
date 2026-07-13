@@ -5,9 +5,13 @@ import { ClientKafka, RpcException } from '@nestjs/microservices';
 import { MongoError } from 'mongodb';
 import { status } from '@grpc/grpc-js';
 import { Inject, Injectable } from '@nestjs/common';
+import { registry, UnfollowedSchema } from '@app/shared';
+import { SchemaType } from '@kafkajs/confluent-schema-registry';
 
 @Injectable()
 export class FollowService {
+  private unfollowedSchemaId!: number;
+
   constructor(
     @InjectModel(Follow.name) private followModel: Model<Follow>,
     @Inject('KAFKA_SERVICE') private readonly kafkaClient: ClientKafka,
@@ -15,6 +19,13 @@ export class FollowService {
 
   async onModuleInit() {
     await this.kafkaClient.connect();
+
+    const unfollowed = await registry.register({
+      type: SchemaType.AVRO,
+      schema: JSON.stringify(UnfollowedSchema),
+    });
+
+    this.unfollowedSchemaId = unfollowed.id;
   }
   // func follow
   async followUser(data: { followerId: string; followingId: string }) {
@@ -69,10 +80,23 @@ export class FollowService {
       });
     }
 
-    this.kafkaClient.emit('unfollowed', {
+    const rawData = {
       followerId: data.followerId,
       followingId: data.followingId,
-    });
+    };
+    try {
+      const encodedPayload = await registry.encode(
+        this.unfollowedSchemaId,
+        rawData,
+      );
+      this.kafkaClient.emit('unfollowed', { value: encodedPayload });
+      console.log(`✅ ส่งข้อความผ่าน Unfollowed Registry สำเร็จ! `);
+    } catch (error) {
+      console.log(
+        '❌ ไม่สามารถส่งข้อความผ่าน Unfollowed Schema Registry ได้:',
+        error,
+      );
+    }
 
     return { success: true, message: 'เลิกติดตามเรียบร้อยแล้ว' };
   }

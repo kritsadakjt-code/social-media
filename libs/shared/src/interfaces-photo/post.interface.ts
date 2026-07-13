@@ -23,11 +23,21 @@ export interface CommentListResponse {
   comments: CommentData[];
 }
 
+export interface LikePostResponse {
+  success: boolean;
+  liked: boolean;
+  likes: number;
+}
+
 export interface PostGrpcService {
   getPosts(data: Record<string, never>): Observable<PostListResponse>;
-  getPostsByIds(data: { ids: string[] }): Observable<PostListResponse>;
+  getPostsByPostIdsRedis(data: { ids: string[] }): Observable<PostListResponse>;
   getPostsByUserId(data: { userId: string }): Observable<PostListResponse>;
-  likePost(data: { postId: string; userId: string }): Observable<PostData>;
+  likePost(data: {
+    postId: string;
+    userId: string;
+    idempotencyKey: string;
+  }): Observable<LikePostResponse>;
   addComment(data: {
     postId: string;
     userId: string;

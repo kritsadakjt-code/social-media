@@ -2,19 +2,26 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
   Param,
   Post,
   Request,
   UseGuards,
 } from '@nestjs/common';
 
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { CreatePostDto } from '@app/shared/dto/users/posts/create-post.dto';
+import {
+  ApiBearerAuth,
+  ApiHeader,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
+import { CreatePostDto } from '@app/shared/dto/posts/create-post.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { CreateCommentDto } from '@app/shared/dto/users/posts/create-comment.dto';
+import { CreateCommentDto } from '@app/shared/dto/posts/create-comment.dto';
 
 import type { RequestWithUser } from '../interfaces/request.interface';
 import { PostsService } from './posts.service';
+import { randomUUID } from 'crypto';
 
 @ApiTags('Posts')
 @Controller('posts')
@@ -29,10 +36,11 @@ export class PostsController {
     @Request() req: RequestWithUser,
     @Body() createPostDto: CreatePostDto,
   ) {
-    this.postsService.createPost(
+    return this.postsService.createPost(
       req.user.userId,
       req.user.username,
       createPostDto.content,
+      createPostDto.mediaId,
     );
   }
 
@@ -44,7 +52,7 @@ export class PostsController {
     return this.postsService.getFeed();
   }
 
-  // ดึงหน้า feed ว่าคนนั้นต้องเห็น post อะไรบ้าง
+  // ดึงหน้า feed ว่าคนนั้นต้องเห็น post อะไรบ้างจาก redis
   @Get('feed')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
@@ -68,11 +76,23 @@ export class PostsController {
   @Post(':id/like')
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Like a post' })
-  likePost(@Request() req: RequestWithUser, @Param('id') postId: string) {
+  @ApiOperation({ summary: 'Like or Unlike a post' })
+  @ApiHeader({
+    name: 'x-idempotency-key',
+    required: false,
+  })
+  likePost(
+    @Request() req: RequestWithUser,
+    @Param('id') postId: string,
+    @Headers('x-idempotency-key') idempotencyKey?: string, //รับจาก client ถ้าไม่มีสร้างเอง
+  ) {
     console.log(`[GATEWAY] User ${req.user.userId} กำลังกดไลก์โพสต์ ${postId}`);
 
-    return this.postsService.likePost(postId, req.user.userId);
+    return this.postsService.likePost(
+      postId,
+      req.user.userId,
+      idempotencyKey ?? randomUUID(),
+    );
   }
 
   // add comment

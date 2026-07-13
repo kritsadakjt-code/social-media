@@ -1,20 +1,33 @@
+import { LikeService } from './like.service';
+
 import { Controller } from '@nestjs/common';
 import { PostService } from './post-service.service';
 import {
+  Ctx,
   EventPattern,
   GrpcMethod,
+  KafkaContext,
   MessagePattern,
   Payload,
 } from '@nestjs/microservices';
 
 @Controller()
 export class PostServiceController {
-  constructor(private readonly postService: PostService) {}
+  constructor(
+    private readonly postService: PostService,
+    private readonly likeService: LikeService,
+  ) {}
 
   // queue RabbitMQ ชื่อ 'create_post'
   @EventPattern('create_post')
   async handlePostCreate(
-    @Payload() data: { userId: string; username: string; content: string },
+    @Payload()
+    data: {
+      userId: string;
+      username: string;
+      content: string;
+      mediaId?: string;
+    },
   ) {
     console.log('📥 [Post Service] ได้รับคำสั่งสร้างโพสต์ใหม่จาก Gateway');
     try {
@@ -29,22 +42,30 @@ export class PostServiceController {
     return this.postService.getPosts();
   }
 
-  @GrpcMethod('PostService', 'GetPostsByIds')
-  async getPostsByIds(data: { ids: string[] }) {
+  @GrpcMethod('PostService', 'getPostsByPostIdsRedis')
+  async getPostsByPostIdsRedis(data: { ids: string[] }) {
     // ป้องกันกรณีส่ง Array ว่างมา
     const idsToSearch = data.ids || [];
-    return this.postService.getPostsByIds(idsToSearch);
+    return this.postService.getPostsByPostIdsRedis(idsToSearch);
   }
 
   @GrpcMethod('PostService', 'GetPostsByUserId')
   async getPostsByUserId(data: { userId: string }) {
-    return this.postService.getPostsByUserId(data.userId);
+    return this.postService.getPostsWithDetailByUserId(data.userId);
   }
 
   @GrpcMethod('PostService', 'LikePost')
-  async likePost(data: { postId: string; userId: string }) {
+  async likePost(data: {
+    postId: string;
+    userId: string;
+    idempotencyKey: string;
+  }) {
     try {
-      return await this.postService.likePost(data.postId, data.userId);
+      return await this.likeService.likePost(
+        data.postId,
+        data.userId,
+        data.idempotencyKey,
+      );
     } catch (error) {
       console.error('❌ กดไลก์ไม่สำเร็จ:', error);
       throw error;
@@ -66,8 +87,26 @@ export class PostServiceController {
     return this.postService.getCommentsByPostId(data.postId);
   }
 
-  @MessagePattern('get_posts_for_feed_cleanup')
+  @MessagePattern('get_post_ids_for_feed_cleanup')
   async getPostsForCleanup(@Payload() data: { userId: string }) {
     return this.postService.getPostsByUserId(data.userId);
+  }
+
+  // รับ event จากการ process file เสร็จเเล้ว
+  @EventPattern('media_events')
+  async handleMediaProcessed(
+    @Payload() encodedMessage: Buffer | { value: Buffer | string },
+    @Ctx() context: KafkaContext,
+  ) {
+    const eventType = context.getMessage().headers?.['event_type']?.toString();
+
+    if (eventType === 'media_processed') {
+      return this.postService.handleMediaProcessed(encodedMessage);
+      // รับ event จาก worker
+    } else if (eventType === 'media_process_failed') {
+      return this.postService.handleMediaProcessFailed(encodedMessage);
+    } else {
+      console.log(`ข้าม Event ที่ไม่เกี่ยวข้อง: ${eventType}`);
+    }
   }
 }

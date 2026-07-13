@@ -1,10 +1,10 @@
-import { FollowGrpcService } from '@app/shared/interfaces/follow.interface';
+import { FollowGrpcService } from '@app/shared/interfaces-photo/follow.interface';
 import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import type { ClientGrpc } from '@nestjs/microservices';
 
 @Injectable()
 export class FollowsService implements OnModuleInit {
-  private followGrpcService: FollowGrpcService;
+  private followGrpcService!: FollowGrpcService;
   constructor(
     @Inject('FOLLOW_SERVICE') private readonly followClient: ClientGrpc,
   ) {}

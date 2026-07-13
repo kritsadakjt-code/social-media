@@ -1,3 +1,4 @@
+import { Redis } from 'ioredis';
 import { Module } from '@nestjs/common';
 import { PostServiceController } from './post-service.controller';
 import { PostService } from './post-service.service';
@@ -6,15 +7,20 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { Post, PostSchema } from './post.schema';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 import { Comment, CommentSchema } from './comment.schema';
+import { ScheduleModule } from '@nestjs/schedule';
+import { Like, LikeSchema } from './like.schema';
+import { LikeService } from './like.service';
+import { LikeAggregatorService } from './like-aggregator.service';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({ isGlobal: true, expandVariables: true }), // expandVariables เพื่อให้ nest อ่านค่า ${} ใน env ได้
+    ScheduleModule.forRoot(),
 
     MongooseModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
-        uri: configService.get<string>('POST_MONGO_URI'),
+        uri: configService.getOrThrow<string>('POST_MONGO_URI'),
       }),
       inject: [ConfigService],
     }),
@@ -22,6 +28,7 @@ import { Comment, CommentSchema } from './comment.schema';
     MongooseModule.forFeature([
       { name: Post.name, schema: PostSchema },
       { name: Comment.name, schema: CommentSchema },
+      { name: Like.name, schema: LikeSchema },
     ]),
 
     ClientsModule.registerAsync([
@@ -44,6 +51,20 @@ import { Comment, CommentSchema } from './comment.schema';
     ]),
   ],
   controllers: [PostServiceController],
-  providers: [PostService],
+  providers: [
+    PostService,
+    LikeService,
+    LikeAggregatorService,
+    {
+      provide: 'REDIS_CLIENT',
+      useFactory: (configService: ConfigService) =>
+        new Redis({
+          host: configService.get('REDIS_HOST', 'localhost'),
+          port: configService.get('REDIS_PORT', 6379),
+          password: configService.get<string>('REDIS_PASSWORD'),
+        }),
+      inject: [ConfigService],
+    },
+  ],
 })
 export class PostServiceModule {}

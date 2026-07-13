@@ -7,6 +7,10 @@ async function bootstrap() {
   const app = await NestFactory.create(NotificationServiceModule);
 
   const configService = app.get(ConfigService);
+
+  const notiPort =
+    configService.get<string>('NOTI_SERVICE_SOCKET_PORT') || 3002;
+
   const kafkaBroker =
     configService.get<string>('KAFKA_BROKER') || 'localhost:9092';
   const kafkaGroupId =
@@ -26,10 +30,10 @@ async function bootstrap() {
   });
   await app.startAllMicroservices();
 
-  await app.listen(3004);
+  await app.listen(notiPort);
   console.log('🔔 Notification Microservice is listening on Kafka...');
   console.log(
-    '🚀 Notification Service is listening on HTTP Port 3004 (For WebSockets)',
+    `🚀 Notification Service is listening on HTTP Port ${notiPort} (For WebSockets)`,
   );
 }
 bootstrap();

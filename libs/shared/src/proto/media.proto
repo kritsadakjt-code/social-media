@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package media;
+
+service MediaService {
+  rpc CreatePresignedUrl (CreatePresignedUrlRequest) returns (CreatePresignedUrlResponse) {}
+  rpc ConfirmUpload (ConfirmUploadRequest) returns (ConfirmUploadResponse) {}
+  rpc GetMediaStatus (GetMediaStatusRequest) returns (GetMediaStatusResponse) {}
+}
+
+message CreatePresignedUrlRequest {
+  string userId = 1;
+  string fileType = 2;
+  int64 fileSize = 3;
+  string purpose = 4;
+}
+
+message CreatePresignedUrlResponse {
+  string mediaId = 1;
+  string presignedUrl = 2;
+  map<string, string> uploadFields = 3;
+  string key = 4;
+}
+
+message ConfirmUploadRequest {
+  string mediaId = 1;
+  string userId = 2;
+}
+
+message ConfirmUploadResponse {
+  string mediaId = 1;
+  string status = 2;
+}
+
+message GetMediaStatusRequest {
+  string mediaId = 1;
+  string userId = 2;
+}
+
+message GetMediaStatusResponse {
+  string mediaId = 1;
+  string status = 2;
+  string originalUrl = 3;
+  string thumbnailUrl = 4;
+  string mediumUrl = 5;
+  string p360Url = 6;
+  string p720Url = 7;
+  string p1080Url = 8;
+}

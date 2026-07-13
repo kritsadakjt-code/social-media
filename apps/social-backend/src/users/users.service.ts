@@ -15,7 +15,7 @@ interface UserGrpcService {
 
 @Injectable()
 export class UsersService implements OnModuleInit {
-  private userGrpcService: UserGrpcService;
+  private userGrpcService!: UserGrpcService;
 
   constructor(@Inject('USER_SERVICE') private readonly client: ClientGrpc) {}
 
