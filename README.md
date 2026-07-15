@@ -1,98 +1,304 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# 🚀 Social Media Backend (Microservices)
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+![NestJS](https://img.shields.io/badge/nestjs-%23E0234E.svg?style=for-the-badge&logo=nestjs&logoColor=white)
+![TypeScript](https://img.shields.io/badge/typescript-%23007ACC.svg?style=for-the-badge&logo=typescript&logoColor=white)
+![MongoDB](https://img.shields.io/badge/MongoDB-%234ea94b.svg?style=for-the-badge&logo=mongodb&logoColor=white)
+![Redis](https://img.shields.io/badge/redis-%23DD0031.svg?style=for-the-badge&logo=redis&logoColor=white)
+![Apache Kafka](https://img.shields.io/badge/Apache_Kafka-231F20?style=for-the-badge&logo=apache-kafka&logoColor=white)
+![RabbitMQ](https://img.shields.io/badge/Rabbitmq-FF6600?style=for-the-badge&logo=rabbitmq&logoColor=white)
+![Docker](https://img.shields.io/badge/docker-%230db7ed.svg?style=for-the-badge&logo=docker&logoColor=white)
+![AWS](https://img.shields.io/badge/AWS-%23FF9900.svg?style=for-the-badge&logo=amazon-aws&logoColor=white)
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+This project is a hands-on study of the architectural patterns used by
+large-scale social platforms (Facebook, Instagram, Twitter/X) — event-driven
+fan-out, polyglot service communication, and the operational trade-offs
+each pattern introduces — implemented at a scope realistic for a single
+developer, not at production scale.
 
-## Description
+## 📑 Table of Contents
+- [Overview](#-overview)
+- [Architecture](#-architecture)
+- [Tech Stack](#-tech-stack)
+- [Key Design Decisions](#-key-design-decisions)
+- [Getting Started](#-getting-started)
+- [API Documentation](#-api-documentation)
+- [Testing](#-testing)
+- [Project Structure](#-project-structure)
+- [Author](#-author)
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+---
 
-## Project setup
+## 📖 Overview
+> 🎯 **Project Focus:** This repository prioritizes system architecture, service-to-service communication, and infrastructure design over feature completeness. 
 
-```bash
-$ npm install
+This system communicates through **gRPC** (synchronous calls), **Kafka** (event streaming), and **RabbitMQ** (async command queue). Each service owns its own MongoDB database following the **database-per-service** pattern, supplemented by **Redis** to handle high-throughput like batching and cross-instance WebSocket communications.
+
+### ✨ Core Features
+- **Authentication:** JWT-based user auth and profile management.
+- **Social Graph:** Follow/unfollow mechanics and personalized feeds.
+- **Feed:** Fan-out-on-write personalized feed via Redis Sorted Sets writes new posts into each follower.
+- **Engagement:** Posts, comments, and Redis-batched likes.
+- **Real-time Chat:** WebSocket (Socket.IO) with Redis adapter for multi-instance scaling.
+- **Notifications:** EventBus-driven real-time push notifications, utilizing smart throttling to batch rapid engagements and prevent alert fatigue.
+- **Media Processing:** Presigned S3 uploads, async processing (sharp/ffmpeg), and CloudFront CDN delivery.
+
+---
+
+## 🏗️ Architecture
+
+```mermaid
+flowchart TB
+    %% 1. Define Nodes & Subgraphs for better layout organization
+    Client([Client])
+
+    subgraph Entrypoint ["API Gateway"]
+        Gateway[API Gateway<br/>social-backend]
+    end
+
+    subgraph Services ["Microservices Layer"]
+        User[User Service]
+        Post[Post Service]
+        Follow[Follow Service]
+        Feed[Feed Service]
+        Chat[Chat Service]
+        Noti[Notification Service]
+        NotiHandler[Like/Comment Handlers]
+        Media[Media Service]
+    end
+
+    subgraph DataLayer ["Databases & Cache"]
+        UserDB[(MongoDB)]
+        PostDB[(MongoDB)]
+        FollowDB[(MongoDB)]
+        ChatDB[(MongoDB)]
+        MediaDB[(MongoDB)]
+        Redis[(Redis)]
+    end
+
+    subgraph ExternalStorage ["AWS Storage Layer"]
+        S3[(AWS S3)]
+        CDN[CloudFront]
+    end
+
+    %% ==========================================
+    %% 2. Define Relationships / Edges
+    %% ==========================================
+
+    %% Client Interactions
+    Client -- HTTP --> Gateway
+    Client -- "WS direct, namespace /chat" --> Chat
+    Client -- "WS direct, namespace /notification" --> Noti
+    Noti -- WS emit --> Client
+
+    %% Gateway to Services
+    Gateway -- gRPC --> User
+    Gateway -- gRPC --> Post
+    Gateway -- gRPC --> Follow
+    Gateway -- "gRPC: GetChatHistory" --> Chat
+    Gateway -- gRPC --> Media
+    Gateway -- "RabbitMQ: create_post" --> Post
+    Gateway -- "Kafka req/reply: get_user_feed" --> Feed
+
+    %% Service to Service (Kafka / CQRS)
+    Feed -- "Kafka req/reply: get_followers" --> Follow
+    Follow -- "Kafka: follow_created" --> Noti
+    Follow -- "Kafka: unfollowed" --> Noti
+    Follow -- "Kafka: unfollowed" --> Feed
+    Post -- "Kafka: post_events" --> Feed
+    Post -- "Kafka: post_events" --> Noti
+    Noti -- EventBus --> NotiHandler --> Noti
+    Media -- "Kafka: media_events (Outbox)" --> Media
+    Media -- "Kafka: media_events" --> Post
+
+    %% Services to Databases
+    User -.-> UserDB
+    Post -.-> PostDB
+    Follow -.-> FollowDB
+    Chat -.-> ChatDB
+    Media -.-> MediaDB
+
+    %% Services to Redis
+    Post -.batch queue.-> Redis
+    Chat -.WS session store.-> Redis
+
+    %% Media to S3/CDN
+    Media --> S3
+    S3 --> CDN
 ```
 
-## Compile and run the project
+Two behaviors worth calling out that aren't obvious from a typical gateway
+diagram:
+ 
+- **Chat and Notification WebSocket traffic bypasses the gateway entirely.**
+  Both services run their own Socket.IO server on their own port
+  (`chat-service` → `/chat` namespace, `notification-service` →
+  `/notification` namespace) with a Redis adapter for multi-instance fan-out.
+  The gateway only handles the HTTP side of chat — fetching history via gRPC
+  — it never proxies the socket connection itself.
+- **Feed fan-out is two independent Kafka request/reply hops, not a
+  broadcast.** When the gateway needs a user's feed, it sends
+  `get_user_feed` directly to `feed-service`. Separately, when
+  `feed-service` receives a `post_events` message for a newly created post,
+  it calls out to `follow-service` with `get_followers` (also Kafka
+  request/reply) to resolve who should see that post before writing it into
+  their feeds.
+
+### 🧩 Service Matrix
+
+| Service | Responsibility | Receives | Sends |
+|---|---|---|---|
+| `social-backend` | API Gateway (Auth, HTTP routing) | HTTP | gRPC (all services); RabbitMQ (`create_post`); Kafka (`get_user_feed`) |
+| `user-service` | User accounts, profiles, JWT | gRPC | — |
+| `post-service` | Posts, comments, likes | gRPC, RabbitMQ (`create_post`), Kafka (`media_events`) | Kafka (`post_events`) |
+| `follow-service` | Follow graph, follower lookups | gRPC, Kafka (`get_followers`) | Kafka (`follow_created`, `unfollowed`) |
+| `feed-service` | Personalized feeds | Kafka (`post_events`, `unfollowed`, `get_user_feed`) | Kafka (`get_followers`) |
+| `chat-service` | Real-time messaging + history | gRPC (`GetChatHistory`), WS (`send_message`) | — |
+| `notification-service`| Real-time push notifications | Kafka (`follow_created`, `post_events`) | WS (throttled per post for likes) |
+| `media-service` | S3 uploads, async processing (ffmpeg/sharp) | gRPC, Kafka (`media_events`) | Kafka (`media_events` via Outbox) |
+
+---
+
+## 🛠️ Tech Stack
+
+- **Backend:** NestJS, TypeScript
+- **Microservices & Messaging:** gRPC, Kafka (Confluent Schema Registry for message contracts), RabbitMQ, WebSocket (Socket.IO + Redis adapter)
+- **Databases:** MongoDB (Database-per-service), Redis (Batch queue, WS session store)
+- **Cloud & Storage:** AWS S3, CloudFront (Signed URLs)
+- **Media Processing:** sharp (Images), ffmpeg (Video)
+- **Infrastructure:** Docker, Docker Compose
+- **Quality Assurance:** Jest (Unit, Integration & E2E — all via Testcontainers), Swagger/OpenAPI
+
+---
+
+## 🧠 Key Design Decisions
+
+1. **RabbitMQ for Commands, Kafka for Events:** Post creation goes through a single RabbitMQ queue (`post_queue`) as a fire-and-forget command. Everything downstream (follow events, post events, media-ready events) flows through Kafka to leverage its broadcast/fan-out capabilities.
+2. **Outbox Pattern & Dead Letter Queue (DLQ):** Media processing retries
+   failed jobs a few times; if still unsuccessful, the failure is recorded
+   in a DLQ via the outbox pattern. A separate scheduled worker reliably
+   publishes all outbox events to Kafka; if that retry is also exhausted,
+   the event is flagged for manual review
+3. **Redis-Backed Like Batching (Known Limitation & Future Fix):** `post-service` buffers likes in a Redis list and drains it every 5s using `RPOP`, batching deltas before MongoDB bulk writes. *Limitation:* `RPOP` has a crash-window gap. *Architectural Debt:* Migrate to Redis Streams with consumer groups and `XACK` to ensure items are only removed after confirmed processing.
+4. **Schema Registry for Event Contracts:** Used Confluent Schema Registry with Avro for Kafka messages. This enforces strict data typing and allows for safe schema evolution, preventing producers from breaking downstream consumers with unexpected payload changes.
+5. **Redis Sorted Sets for Feed Fan-out-on-write:** On a new post, `feed-service` writes
+   into each follower's `feed:{userId}` sorted set, scored by timestamp so
+   the feed stays chronologically ordered without extra sorting, capped at
+   the latest 20 items to bound memory per user, with a 7-day TTL so
+   inactive users' feeds expire automatically instead of needing a cleanup job.
+6. **Idempotency Keys for Toggle Actions:** Like/unlike is a toggle, so a
+   network retry of the same click could accidentally flip a successful
+   like back into an unlike. Each request carries an idempotency key caches the result
+   in Redis for 24h
+7. **Database-per-Service:** Enforced strict service boundaries; all cross-service reads go through gRPC, preventing unauthorized direct database access.
+8. **Snowflake IDs & S3 Object Sharding:** Utilized Snowflake IDs for media
+   assets and implemented a deterministic hashing strategy (SHA-256
+   prefixing). This distributes objects uniformly across 256 logical
+   shards (`00`-`ff`) to mitigate AWS S3 hot partition bottlenecks caused
+   by sequential time-based IDs
+
+---
+
+## 🗺️ Future Roadmap 
+
+1. **CI/CD (GitHub Actions):** automated lint/test/build on push.
+2. **Observability (Prometheus + Grafana + Jaeger):** Prometheus/Grafana for
+   metrics (Kafka consumer lag, outbox publish failures, per-service
+   latency); Jaeger for distributed tracing across the gRPC → Kafka →
+   Kafka req/reply chains, since debugging cross-service latency currently
+   means correlating logs by hand.
+3. **Load Testing (k6):** Utilize k6 to simulate real-world social media
+   traffic spikes and benchmark our architectural decisions. Key testing
+   scenarios include:
+   - **Engagement Spikes:** Stress-testing the Redis-backed like batching
+     mechanism with thousands of concurrent likes to ensure zero data loss
+     during MongoDB bulk writes.
+   - **Fan-out Latency:** Measuring the time it takes for Kafka to fan-out
+     a new post to 10,000+ followers via the `feed-service` Redis Sorted Sets.
+4. **Elasticsearch:** Integrate Elasticsearch to enable high-performance,
+   fuzzy search capabilities. This will handle complex queries like
+   searching for users, feed, and post content, effectively offloading
+   heavy text-matching workloads from the primary MongoDB databases.
+5. **Kubernetes:** migrating from Docker Compose to explore service
+   discovery, scaling, and rolling deploys at the orchestration layer.
+6. **Debezium (CDC):** exploring change-data-capture as an alternative to
+   the manual outbox worker for propagating MongoDB writes to Kafka.
+  
+---
+## 🚀 Getting Started
+
+### Prerequisites
+- Node.js 20+
+- Docker & Docker Compose
+
+### Setup
 
 ```bash
-# development
-$ npm run start
+git clone https://github.com/kritsadakjt-code/social-media.git
+cd social-media
+npm install
+cp .env.example .env
+```
+*(Ensure you fill in your AWS credentials, JWT secret, and Kafka/RabbitMQ URLs in the `.env` file).*
 
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+### Run Infrastructure
+Start MongoDB, Redis, Kafka, RabbitMQ, and Elasticsearch:
+```bash
+docker-compose up -d
 ```
 
-## Run tests
+### Run Services
+Start the API gateway and all 7 microservices concurrently:
+```bash
+npm run start:all
+```
+To run a single service during development:
+```bash
+npm run start:dev post-service
+```
+The API Gateway will be available at `http://localhost:3000`.
+
+---
+
+## 📚 API Documentation
+
+Swagger UI is available at `http://localhost:3000/api` once the API Gateway is running.
+
+---
+
+## 🧪 Testing
 
 ```bash
-# unit tests
-$ npm run test
+npm run test         # Unit tests
+npm run test:e2e     # E2E tests (Gateway)
+npm run test:cov     # Coverage report
+```
+> *Note: Unit test coverage is currently strongest in `post-service` (media utils, backoff logic) and the gateway's `posts` flow. Expanding E2E coverage for `media-service` and `feed-service` is in progress.*
 
-# e2e tests
-$ npm run test:e2e
+---
 
-# test coverage
-$ npm run test:cov
+## 📁 Project Structure
+
+```text
+├── apps/
+│   ├── social-backend/         # API Gateway
+│   ├── user-service/
+│   ├── post-service/
+│   ├── follow-service/
+│   ├── chat-service/
+│   ├── notification-service/
+│   ├── feed-service/
+│   └── media-service/
+└── libs/
+    └── shared/                 # Shared DTOs, Kafka schemas, gRPC proto files
 ```
 
-## Deployment
+---
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+## 👨‍💻 Author
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+**Kritsada**
+- GitHub: [@kritsadakjt-code](https://github.com/kritsadakjt-code)
+- LinkedIn: [Your LinkedIn Profile URL] *(Don't forget to update this!)*
 
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
-```
-
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+## 📄 License
+UNLICENSED — Personal portfolio project.
