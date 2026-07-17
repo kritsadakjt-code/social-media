@@ -333,14 +333,23 @@ Swagger UI is available at `http://localhost:3000/api` once the API Gateway is r
 ---
 
 ## 🧪 Testing
+### 🏃‍♂️ Running Tests
 
-```bash
-npm run test         # Unit tests
-npm run test:e2e     # E2E tests (Gateway)
-npm run test:cov     # Coverage report
-```
-> *Note: Unit test coverage is currently strongest in `post-service` (media utils, backoff logic) and the gateway's `posts` flow. Expanding E2E coverage for `media-service` and `feed-service` is in progress.*
+    npm run test          # Run Unit tests 
+    npm run test:e2e      # Run E2E tests (Gateway)
+    npm run test:cov      # Coverage report
 
+### 📊 Current Coverage
+
+- **Unit Tests:** Focus on areas with critical failure modes — `post-service`'s like-aggregation (RPOP crash-window behavior), `notification-service`'s like-throttling, `feed-service`'s fan-out logic, and utility modules in `media-service` and `chat-service`.
+- **Integration Tests:** Utilize Testcontainers to cover `post-service`'s Kafka consumption and like-aggregation against real Redis/Kafka instances.
+- **E2E Tests:** The gateway's post-creation flow (`posts.e2e-spec.ts`) is currently the primary substantive suite. *(Note: Default NestJS boilerplate tests in individual microservices still exist and will be cleaned up).*
+
+### 🚀 Next to Cover (Testing Roadmap)
+
+- **Business-logic Unit Tests:** Expand coverage for `follow-service`, `user-service`, and `social-backend` by mocking their Mongo repositories and gRPC clients.
+- **Per-Service Integration Suites:** Move beyond the gateway to ensure each microservice is tested in isolation. Since each service owns its database, this requires dedicated Testcontainers setups (Mongo + Kafka) per service, following the `post-service` pattern.
+- **Media Service Integration:** Test the S3/CloudFront upload flow using a local S3-compatible container (LocalStack via Testcontainers) to fully validate actual AWS SDK operations without hitting real AWS.
 ---
 
 ## 📁 Project Structure
