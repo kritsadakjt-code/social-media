@@ -178,7 +178,7 @@ diagram:
    in a DLQ via the outbox pattern. A separate scheduled worker reliably
    publishes all outbox events to Kafka; if that retry is also exhausted,
    the event is flagged for manual review
-3. **Redis-Backed Like Batching (Known Limitation & Future Fix):** `post-service` buffers likes in a Redis list and drains it every 5s using `RPOP`, batching deltas before MongoDB bulk writes. *Limitation:* `RPOP` has a crash-window gap. *Architectural Debt:* Migrate to Redis Streams with consumer groups and `XACK` to ensure items are only removed after confirmed processing.
+3. **Redis-Backed Like Batching (Known Limitation & Future Fix):** `post-service` buffers likes in a Redis list and drains it every 5s using `RPOP`, batching deltas before MongoDB bulk writes. *Limitation:* `RPOP` has a crash-window gap. *Planned Fix:* Migrate to Redis Streams with consumer groups and `XACK` to ensure items are only removed after confirmed processing.
 4. **Schema Registry for Event Contracts:** Used Confluent Schema Registry with Avro for Kafka messages. This enforces strict data typing and allows for safe schema evolution, preventing producers from breaking downstream consumers with unexpected payload changes.
 5. **Redis Sorted Sets for Feed Fan-out-on-write:** On a new post, `feed-service` writes
    into each follower's `feed:{userId}` sorted set, scored by timestamp so
@@ -198,14 +198,81 @@ diagram:
 
 ---
 
+## 🔒 Security
+
+- **Password Hashing:** bcrypt with 10 salt rounds — passwords are never
+  stored in plaintext, and hashes remain computationally expensive to
+  brute-force even if the database is compromised.
+- **Authentication (HTTP & WebSocket):** JWT via Passport (`JwtAuthGuard`)
+  protects gateway HTTP routes; `WsJwtGuard` validates the JWT during the
+  WebSocket handshake, so real-time chat/notification connections require
+  the same auth as HTTP — not open to anonymous sockets.
+- **Global Input Validation:** `ValidationPipe` with `whitelist` +
+  `forbidNonWhitelisted` strips or rejects any field not declared in a
+  DTO, preventing mass-assignment-style payloads from reaching business logic.
+- **Security Headers:** `helmet()` applied globally on the gateway.
+- **Distributed Rate Limiting:** Redis-backed throttler storage keeps
+  limits consistent across multiple gateway instances rather than
+  per-process. Global limit is 100 req/min; auth endpoints are stricter —
+  register at 3/min, login at 5/min — specifically to slow down
+  credential-stuffing and brute-force attempts.
+- **Time-Limited Media Access:** S3 presigned upload URLs expire in 5
+  minutes; CloudFront delivery uses signed URLs instead of a public
+  bucket, so media access is scoped and time-limited.
+- **Idempotency Keys for Toggle Actions:** prevents a network retry from
+  silently duplicating a state-changing action (see Key Design Decisions).
+
+---
+
+## 🔭 Known Limitations
+
+- **Like batching uses Redis `RPOP`** — has a crash-window gap: if the
+  process dies after popping an item but before the MongoDB bulk write
+  completes, that like is lost with no recovery. Planned fix: migrate to
+  Redis Streams with consumer groups and `XACK`.
+- **Outbox/DLQ failure handling is manual** — once the publish-to-Kafka
+  retry is exhausted, the event is just flagged for manual review; no
+  automated alerting (Slack/PagerDuty) or dashboarding yet.
+- **CORS is wide-open (`origin: '*'`)** on both the HTTP gateway and the
+  chat WebSocket gateway — acceptable for local development, needs
+  scoping to specific frontend origins before any real deployment.
+- **No refresh token or early token revocation** — JWTs expire after 1
+  hour with no renewal path, and a leaked token can't be invalidated
+  before it naturally expires.
+- **No TLS on internal gRPC traffic** — service-to-service calls are
+  plaintext; fine on a single Docker Compose network, not for a
+  multi-host deployment.
+- **No correlation/trace ID across service calls** — a request crossing
+  gRPC and multiple Kafka request/reply hops can't be traced end-to-end;
+  debugging currently means correlating logs by hand. Prerequisite for the
+  OpenTelemetry/Jaeger work in the Roadmap.
+- **Secrets are stored in plaintext `.env` files** — fine for local
+  development, but a real deployment would need a secrets manager (AWS
+  Secrets Manager, HashiCorp Vault) for rotation, access auditing, and to
+  avoid a single leaked file exposing every credential at once.
+- **The `role` field on the user schema isn't enforced anywhere** — no
+  `RolesGuard` currently checks it, so it exists in the data model but
+  has no effect yet.
+- **Feed fan-out is fan-out-on-write only** — no hybrid fan-out-on-read
+  path for high-follower accounts, which real systems at this scale
+  typically need to avoid write amplification.
+- **No dependency vulnerability scanning** (e.g. `npm audit`, Dependabot)
+  yet — planned as part of the GitHub Actions CI/CD work in the Roadmap.
+- **Test coverage is uneven across services** — see the Testing section
+  for what's covered and what's next.
+
+---
+
 ## 🗺️ Future Roadmap 
 
 1. **CI/CD (GitHub Actions):** automated lint/test/build on push.
-2. **Observability (Prometheus + Grafana + Jaeger):** Prometheus/Grafana for
-   metrics (Kafka consumer lag, outbox publish failures, per-service
-   latency); Jaeger for distributed tracing across the gRPC → Kafka →
-   Kafka req/reply chains, since debugging cross-service latency currently
-   means correlating logs by hand.
+2. **Observability (OpenTelemetry + Prometheus + Grafana + Jaeger):**
+   Instrument services with OpenTelemetry to propagate a trace ID across
+   gRPC metadata and Kafka message headers — currently there's no
+   correlation ID at all, so a request crossing multiple service hops
+   can't be traced end-to-end. Prometheus/Grafana for metrics (Kafka
+   consumer lag, outbox publish failures, per-service latency); Jaeger for
+   visualizing the traces OpenTelemetry produces.
 3. **Load Testing (k6):** Utilize k6 to simulate real-world social media
    traffic spikes and benchmark our architectural decisions. Key testing
    scenarios include:
@@ -214,12 +281,12 @@ diagram:
      during MongoDB bulk writes.
    - **Fan-out Latency:** Measuring the time it takes for Kafka to fan-out
      a new post to 10,000+ followers via the `feed-service` Redis Sorted Sets.
-4. **Elasticsearch:** Integrate Elasticsearch to enable high-performance,
+4. **Kubernetes:** migrating from Docker Compose to explore service
+   discovery, scaling, and rolling deploys at the orchestration layer.
+5. **Elasticsearch:** Integrate Elasticsearch to enable high-performance,
    fuzzy search capabilities. This will handle complex queries like
    searching for users, feed, and post content, effectively offloading
    heavy text-matching workloads from the primary MongoDB databases.
-5. **Kubernetes:** migrating from Docker Compose to explore service
-   discovery, scaling, and rolling deploys at the orchestration layer.
 6. **Debezium (CDC):** exploring change-data-capture as an alternative to
    the manual outbox worker for propagating MongoDB writes to Kafka.
   
@@ -241,7 +308,7 @@ cp .env.example .env
 *(Ensure you fill in your AWS credentials, JWT secret, and Kafka/RabbitMQ URLs in the `.env` file).*
 
 ### Run Infrastructure
-Start MongoDB, Redis, Kafka, RabbitMQ, and Elasticsearch:
+Start MongoDB, Redis, Kafka, and RabbitMQ:
 ```bash
 docker-compose up -d
 ```
