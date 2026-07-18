@@ -223,7 +223,7 @@ describe('LikeThrottleService', () => {
       redisMock.sadd.mockResolvedValue(1);
       redisMock.expire.mockResolvedValue(1);
       redisMock.set.mockResolvedValue('OK'); // ยังไม่ throttle
-      redisMock.scard.mockResolvedValue(3); // มี 1 คนกดไลก์
+      redisMock.scard.mockResolvedValue(1); // มี 1 คนกดไลก์
       redisMock.del.mockResolvedValue(1);
 
       await service.trackPendingLike('post_001', 'owner_001', 'user_A');
