@@ -47,7 +47,7 @@ This system communicates through **gRPC** (synchronous calls), **Kafka** (event 
 
 ---
 
-## 🏗️ Architecture
+## 🧱 Architecture
 
 ```mermaid
 flowchart TB
@@ -161,7 +161,7 @@ diagram:
 
 ---
 
-## 🛠️ Tech Stack
+## 🔧 Tech Stack
 
 - **Backend:** NestJS, TypeScript
 - **Microservices & Messaging:** gRPC, Kafka (Confluent Schema Registry for message contracts), RabbitMQ, WebSocket (Socket.IO + Redis adapter)
@@ -266,7 +266,7 @@ for 24h.
 
 ---
 
-## 🗺️ Future Roadmap 
+## 🧭 Future Roadmap
 
 1. **CI/CD (GitHub Actions):** automated lint/test/build on push.
 2. **Observability (OpenTelemetry + Prometheus + Grafana + Jaeger):**
@@ -380,8 +380,7 @@ Swagger UI is available at `http://localhost:3000/api` once the API Gateway is r
 ```
 
 ---
-
-## 👨‍💻 Author
+## 👤 Author
 
 **Kritsada**
 - GitHub: [@kritsadakjt-code](https://github.com/kritsadakjt-code)
