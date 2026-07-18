@@ -20,6 +20,9 @@ developer, not at production scale.
 - [Architecture](#-architecture)
 - [Tech Stack](#-tech-stack)
 - [Key Design Decisions](#-key-design-decisions)
+- [Security](#-security)
+- [Known Limitations](#-known-limitations)
+- [Future Roadmap](#-future-roadmap)
 - [Getting Started](#-getting-started)
 - [API Documentation](#-api-documentation)
 - [Testing](#-testing)
@@ -177,7 +180,7 @@ diagram:
    failed jobs a few times; if still unsuccessful, the failure is recorded
    in a DLQ via the outbox pattern. A separate scheduled worker reliably
    publishes all outbox events to Kafka; if that retry is also exhausted,
-   the event is flagged for manual review
+   the event is flagged for manual review.
 3. **Redis-Backed Like Batching (Known Limitation & Future Fix):** `post-service` buffers likes in a Redis list and drains it every 5s using `RPOP`, batching deltas before MongoDB bulk writes. *Limitation:* `RPOP` has a crash-window gap. *Planned Fix:* Migrate to Redis Streams with consumer groups and `XACK` to ensure items are only removed after confirmed processing.
 4. **Schema Registry for Event Contracts:** Used Confluent Schema Registry with Avro for Kafka messages. This enforces strict data typing and allows for safe schema evolution, preventing producers from breaking downstream consumers with unexpected payload changes.
 5. **Redis Sorted Sets for Feed Fan-out-on-write:** On a new post, `feed-service` writes
@@ -187,14 +190,14 @@ diagram:
    inactive users' feeds expire automatically instead of needing a cleanup job.
 6. **Idempotency Keys for Toggle Actions:** Like/unlike is a toggle, so a
    network retry of the same click could accidentally flip a successful
-   like back into an unlike. Each request carries an idempotency key caches the result
-   in Redis for 24h
+   like back into an unlike. Each request carries an idempotency key that caches the result in Redis
+for 24h.
 7. **Database-per-Service:** Enforced strict service boundaries; all cross-service reads go through gRPC, preventing unauthorized direct database access.
 8. **Snowflake IDs & S3 Object Sharding:** Utilized Snowflake IDs for media
    assets and implemented a deterministic hashing strategy (SHA-256
    prefixing). This distributes objects uniformly across 256 logical
    shards (`00`-`ff`) to mitigate AWS S3 hot partition bottlenecks caused
-   by sequential time-based IDs
+   by sequential time-based IDs.
 
 ---
 
@@ -281,13 +284,21 @@ diagram:
      during MongoDB bulk writes.
    - **Fan-out Latency:** Measuring the time it takes for Kafka to fan-out
      a new post to 10,000+ followers via the `feed-service` Redis Sorted Sets.
-4. **Kubernetes:** migrating from Docker Compose to explore service
+4. **Circuit Breakers:** No circuit breaker currently wraps
+   the gRPC or Kafka request/reply calls — a downstream outage means every
+   request keeps retrying against a service that's already down.
+5. **Chaos Engineering:** validate resilience claims that currently rest
+   on code review alone — kill the Kafka broker mid-flight to confirm the
+   Outbox/DLQ path recovers as designed, kill a service process during the
+   Redis `RPOP` batch-drain window to observe actual data loss, and
+   confirm circuit breakers trip and recover as expected.
+6. **Kubernetes:** migrating from Docker Compose to explore service
    discovery, scaling, and rolling deploys at the orchestration layer.
-5. **Elasticsearch:** Integrate Elasticsearch to enable high-performance,
+7. **Elasticsearch:** Integrate Elasticsearch to enable high-performance,
    fuzzy search capabilities. This will handle complex queries like
    searching for users, feed, and post content, effectively offloading
    heavy text-matching workloads from the primary MongoDB databases.
-6. **Debezium (CDC):** exploring change-data-capture as an alternative to
+8. **Debezium (CDC):** exploring change-data-capture as an alternative to
    the manual outbox worker for propagating MongoDB writes to Kafka.
   
 ---
@@ -305,10 +316,10 @@ cd social-media
 npm install
 cp .env.example .env
 ```
-*(Ensure you fill in your AWS credentials, JWT secret, and Kafka/RabbitMQ URLs in the `.env` file).*
+*(Fill in the values in `.env` — see `.env.example` for the full list of required variables.)*
 
 ### Run Infrastructure
-Start MongoDB, Redis, Kafka, and RabbitMQ:
+Start MongoDB, Redis, RabbitMQ, Kafka, Kafka UI, and Schema Registry:
 ```bash
 docker-compose up -d
 ```
@@ -343,7 +354,7 @@ Swagger UI is available at `http://localhost:3000/api` once the API Gateway is r
 
 - **Unit Tests:** Focus on areas with critical failure modes — `post-service`'s like-aggregation (RPOP crash-window behavior), `notification-service`'s like-throttling, `feed-service`'s fan-out logic, and utility modules in `media-service` and `chat-service`.
 - **Integration Tests:** Utilize Testcontainers to cover `post-service`'s Kafka consumption and like-aggregation against real Redis/Kafka instances.
-- **E2E Tests:** The gateway's post-creation flow (`posts.e2e-spec.ts`) is currently the primary substantive suite. *(Note: Default NestJS boilerplate tests in individual microservices still exist and will be cleaned up).*
+- **E2E Tests:** The gateway's post-creation flow (`posts.e2e-spec.ts`) is currently the primary substantive suite.*
 
 ### 🚀 Next to Cover (Testing Roadmap)
 
@@ -377,4 +388,4 @@ Swagger UI is available at `http://localhost:3000/api` once the API Gateway is r
 - LinkedIn: [Your LinkedIn Profile URL] *(Don't forget to update this!)*
 
 ## 📄 License
-UNLICENSED — Personal portfolio project.
+MIT — see [LICENSE](./LICENSE) for details.
