@@ -385,7 +385,7 @@ Swagger UI is available at `http://localhost:3000/api` once the API Gateway is r
 ## 👤 Author
 
 **Kritsada**
-- GitHub: [@kritsadakjt-code](https://github.com/kritsadakjt-code)
+- Email: [kritsada.kjt@gmail.com](mailto:kritsada.kjt@gmail.com)
 - LinkedIn: [linkedin.com/in/kritsada-kjt](https://www.linkedin.com/in/kritsada-kjt/)
 
 ## 📄 License
