@@ -386,7 +386,7 @@ Swagger UI is available at `http://localhost:3000/api` once the API Gateway is r
 
 **Kritsada**
 - GitHub: [@kritsadakjt-code](https://github.com/kritsadakjt-code)
-- LinkedIn: [Your LinkedIn Profile URL] *(Don't forget to update this!)*
+- LinkedIn: [linkedin.com/in/kritsada-kjt](https://www.linkedin.com/in/kritsada-kjt/)
 
 ## 📄 License
 MIT — see [LICENSE](./LICENSE) for details.
