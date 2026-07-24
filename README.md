@@ -251,6 +251,12 @@ for 24h.
   gRPC and multiple Kafka request/reply hops can't be traced end-to-end;
   debugging currently means correlating logs by hand. Prerequisite for the
   OpenTelemetry/Jaeger work in the Roadmap.
+- **No Saga pattern / Distributed Transaction management** — operations spanning
+  multiple services (e.g., cross-service data orchestration via Kafka) rely on
+  eventual consistency without compensating transactions. If a downstream service
+  fails mid-flow, there is no automated Saga orchestrator or rollback mechanism
+  to revert state across service boundaries. Planned fix: implement Orchestration-based
+  or Choreography-based Saga pattern for critical multi-service workflows.
 - **Secrets are stored in plaintext `.env` files** — fine for local
   development, but a real deployment would need a secrets manager (AWS
   Secrets Manager, HashiCorp Vault) for rotation, access auditing, and to
