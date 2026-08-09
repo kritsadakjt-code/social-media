@@ -23,7 +23,7 @@ import {
 import { SchemaType } from '@kafkajs/confluent-schema-registry';
 import { SnowflakeIdService } from './snowflake.service';
 import { createHash } from 'crypto';
-import { firstValueFrom } from 'rxjs';
+// import { firstValueFrom } from 'rxjs';
 import { OutboxDocument, OutboxEvent } from './outbox/outbox.schema';
 
 // MIME ควรเช็คว่าเป็นรูปหรือวิดีโอจริงมั้ยด้วย
@@ -270,12 +270,7 @@ export class MediaService implements OnModuleInit {
         urls = await this.mediaProcessorService.processVideo(key, mediaId);
       }
 
-      // update DB
-      await this.mediaModel.findByIdAndUpdate(mediaId, {
-        status: 'completed',
-        ...urls,
-      });
-
+      // เอาไว้นอก transaction เพราะ ใน transaction ให้ทําเฉพาะส่วนที่เกี่ยวกับ db เดี๋ยวจะเปลือง resource ในการจอง transaction ไปเปล่าๆ เพราะอาจจะช้าจาก encode
       const encodedPayload = await registry.encode(
         this.mediaProcessedSchemaId,
         {
@@ -290,14 +285,46 @@ export class MediaService implements OnModuleInit {
           p1080Url: urls.p1080Url ?? null,
         },
       );
-      // emit Kafka แจ้ง post-service
-      await firstValueFrom(
-        this.kafkaClient.emit('media_events', {
-          key: mediaId,
-          value: encodedPayload,
-          headers: { event_type: 'media_processed' },
-        }),
-      );
+
+      // update + เขียนลง outbox ใน transaction เดียวกัน
+      const session = await this.mediaModel.db.startSession();
+      try {
+        await session.withTransaction(async () => {
+          await this.mediaModel.findByIdAndUpdate(mediaId, {
+            status: 'completed',
+            ...urls,
+          });
+
+          // บันทึก event เเทนการ emit kafka ตรงๆ ให้ worker ดึงจากนี้ไปเเทน
+          await this.outboxModel.create(
+            [
+              {
+                eventId: `media-processed-${mediaId}`,
+                topic: 'media_events',
+                key: mediaId,
+                value: encodedPayload,
+                headers: { event_type: 'media_processed' },
+                status: 'pending',
+                attempts: 0,
+                nextRetryAt: new Date(),
+                payloadEncodingType: 'avro',
+              },
+            ],
+            { session },
+          );
+        });
+      } finally {
+        await session.endSession();
+      }
+
+      // ปกติถ้า emit ตรงๆ Kafka แจ้ง post-service จะเกิดปัญหา dual-write
+      // await firstValueFrom(
+      //   this.kafkaClient.emit('media_events', {
+      //     key: mediaId,
+      //     value: encodedPayload,
+      //     headers: { event_type: 'media_processed' },
+      //   }),
+      // );
 
       this.logger.log(`✅ Process media สำเร็จ: ${mediaId}`);
     } catch (error) {
