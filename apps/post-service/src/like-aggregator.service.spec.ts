@@ -212,7 +212,7 @@ describe('LikeAggregatorService', () => {
 
       await service.flushLikesToDatabase();
 
-      expect(redisMock.rpop).toHaveBeenCalledTimes(4);
+      expect(redisMock.rpop).toHaveBeenCalledTimes(6);
     });
   });
 
