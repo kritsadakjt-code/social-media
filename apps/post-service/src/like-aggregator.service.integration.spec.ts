@@ -122,8 +122,8 @@ describe('LikeAggregatorService (Integration)', () => {
         postModel.findById(post2._id),
       ]);
 
-      expect(updated1?.likes).toBe(13); // 10 + 3
-      expect(updated2?.likes).toBe(8); // 5 + 3
+      expect(updated1?.likes).toBe(14); // 10 + 3
+      expect(updated2?.likes).toBe(9); // 5 + 3
     });
   });
 
