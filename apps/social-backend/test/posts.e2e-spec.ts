@@ -108,6 +108,7 @@ describe('Posts E2E', () => {
   });
 
   afterAll(async () => {
+    console.log('🛑 กำลังปิดระบบทดสอบ...');
     // ปิด app หยุดรับ request + หยุดต่อ db
     await app?.close().catch((err: Error) => {
       console.warn('⚠️ app close failed:', err.message);
@@ -115,6 +116,7 @@ describe('Posts E2E', () => {
 
     await stopServices(services);
     await stopInfrastructure(infra);
+    console.log('✅ ปิดระบบทดสอบสำเร็จ');
   });
 
   // GET /posts/all
