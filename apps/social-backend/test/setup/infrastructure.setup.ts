@@ -61,10 +61,22 @@ export async function startInfrastructure(): Promise<Infrastructure> {
     brokers: [kafkaBroker],
   }).admin();
   await kafkaAdmin.connect();
-  await kafkaAdmin.createTopics({
-    topics: [{ topic: 'get_user_feed.reply' }],
-  });
-  await kafkaAdmin.disconnect();
+  try {
+    await kafkaAdmin.createTopics({
+      topics: [
+        { topic: 'get_user_feed.reply' },
+        // Topic ที่ขาด
+        { topic: 'post_events' },
+        { topic: 'media_events' },
+        { topic: 'get_followers' },
+        { topic: 'get_followers.reply' },
+      ],
+    });
+  } catch (error) {
+    console.error('Failed to create topics:', error);
+  } finally {
+    await kafkaAdmin.disconnect();
+  }
 
   const schemaRegistryContainer = await new GenericContainer(
     'confluentinc/cp-schema-registry:8.2.0',

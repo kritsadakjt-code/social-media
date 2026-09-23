@@ -1,4 +1,9 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  Logger,
+  OnApplicationShutdown,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Like, LikeDocument } from './like.schema';
 import { Model } from 'mongoose';
@@ -10,7 +15,7 @@ import { SchemaType } from '@kafkajs/confluent-schema-registry';
 import { status } from '@grpc/grpc-js';
 
 @Injectable()
-export class LikeService {
+export class LikeService implements OnApplicationShutdown {
   private postLikedSchemaId!: number;
   private readonly logger = new Logger(LikeService.name);
 
@@ -32,6 +37,15 @@ export class LikeService {
     this.postLikedSchemaId = postLiked.id;
 
     await this.kafkaClient.connect();
+  }
+
+  // new Redis เป็นการสร้าง Connection ต่อไปที่ container ต้องสั่งปิดเอง เพราะอาจจะเปิด connection ค้างไว้ได้ เเละ nest ไม่ได้ปิดให้เองเหมือน kafka
+  // เเละทําให้ test e2e จบงานไม่ได้หาก connection ค้างอยู่
+  async onApplicationShutdown() {
+    this.logger.log('🛑 กำลังปิด Redis Connection...');
+    if (this.redis) {
+      await this.redis.quit();
+    }
   }
 
   async likePost(postId: string, userId: string, idempotencyKey: string) {
