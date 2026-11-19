@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package feed;
+
+service FeedService {
+  rpc GetUserFeed (GetUserFeedRequest) returns (GetUserFeedResponse);
+}
+
+message GetUserFeedRequest {
+  string userId = 1;
+}
+
+message GetUserFeedResponse {
+  repeated string postIds = 1;
+}

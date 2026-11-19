@@ -33,6 +33,7 @@ async function bootstrap() {
       consumer: {
         groupId: 'follow-service-consumer',
       },
+      run: { partitionsConsumedConcurrently: 3 },
     },
   });
 

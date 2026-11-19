@@ -19,10 +19,10 @@ import { MediaModule } from './media/media.module';
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
         throttlers: [
-          {
-            ttl: 60000,
-            limit: 100,
-          },
+          // {
+          //   ttl: 60000,
+          //   limit: 100,
+          // },
         ],
 
         storage: new ThrottlerStorageRedisService({

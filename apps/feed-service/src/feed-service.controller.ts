@@ -2,13 +2,13 @@ import { Controller } from '@nestjs/common';
 import {
   Ctx,
   EventPattern,
+  GrpcMethod,
   KafkaContext,
-  MessagePattern,
   Payload,
 } from '@nestjs/microservices';
 
 import { FeedService } from './feed-service.service';
-
+import type { FollowerChunkPayload } from './feed-service.service';
 @Controller()
 export class FeedServiceController {
   constructor(private readonly feedService: FeedService) {}
@@ -26,7 +26,18 @@ export class FeedServiceController {
       console.log('หยุดทํางานไม่ใช่ post_created');
       return;
     }
+
+    const t0 = Date.now();
+    const partition = context.getPartition();
+    console.log(
+      `[TRACE feed post_events] START partition=${partition} offset=${originalMessage.offset} t=${t0}`,
+    );
+
     await this.feedService.handlePostCreated(encodedMessage);
+
+    console.log(
+      `[TRACE feed post_events] END   partition=${partition} offset=${originalMessage.offset} took=${Date.now() - t0}ms t=${Date.now()}`,
+    );
   }
 
   @EventPattern('unfollowed')
@@ -35,10 +46,19 @@ export class FeedServiceController {
   ) {
     await this.feedService.handleUnfollowed(encodedMessage);
   }
+  // ควรเป็น grpc เพราะ เป็นการ query
+  @GrpcMethod('FeedService', 'GetUserFeed')
+  async getUserFeed(data: { userId: string }) {
+    const postIds = await this.feedService.getUserFeed(data.userId);
+    return { postIds };
+  }
 
-  @MessagePattern('get_user_feed')
-  async getUserFeed(@Payload() data: { userId: string }) {
-    return this.feedService.getUserFeed(data.userId);
+  @EventPattern('followers_chunk')
+  async handleFollowersChunk(@Payload() chunk: FollowerChunkPayload) {
+    console.log(
+      `📨 [CONTROLLER] รับ followers_chunk: chunk ${chunk.chunkIndex + 1}/${chunk.totalChunks}`,
+    );
+    return this.feedService.handleFollowersChunk(chunk);
   }
 }
 

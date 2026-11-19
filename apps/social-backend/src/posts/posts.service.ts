@@ -1,4 +1,5 @@
 import { PostGrpcService } from '@app/shared';
+import { FeedGrpcService } from '@app/shared/interfaces-photo/feed.interface';
 import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import type {
   ClientGrpc,
@@ -10,11 +11,13 @@ import { firstValueFrom } from 'rxjs';
 @Injectable()
 export class PostsService implements OnModuleInit {
   private postGrpcService!: PostGrpcService;
+  private feedGrpcService!: FeedGrpcService;
 
   constructor(
     @Inject('POST_SERVICE_RABBITMQ')
     private readonly postRabbitClient: ClientProxy,
     @Inject('POST_SERVICE_GRPC') private readonly postGrpcClient: ClientGrpc,
+    @Inject('FEED_SERVICE_GRPC') private readonly feedGrpcClient: ClientGrpc,
     @Inject('FEED_SERVICE') private readonly feedKafkaClient: ClientKafka,
   ) {}
 
@@ -22,6 +25,8 @@ export class PostsService implements OnModuleInit {
     this.postGrpcService =
       this.postGrpcClient.getService<PostGrpcService>('PostService');
     this.feedKafkaClient.subscribeToResponseOf('get_user_feed');
+    this.feedGrpcService =
+      this.feedGrpcClient.getService<FeedGrpcService>('FeedService');
     await this.feedKafkaClient.connect();
   }
 
@@ -46,8 +51,8 @@ export class PostsService implements OnModuleInit {
 
   async getUserFeedById(userId: string) {
     console.log(`[GATEWAY] กำลังดึงหน้า Feed ผู้ใช้: ${userId}`);
-    const postIds: string[] = await firstValueFrom(
-      this.feedKafkaClient.send('get_user_feed', { userId }),
+    const { postIds } = await firstValueFrom(
+      this.feedGrpcService.getUserFeed({ userId }),
     );
 
     if (!postIds || postIds.length === 0) {

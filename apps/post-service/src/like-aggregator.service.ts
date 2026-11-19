@@ -14,6 +14,11 @@ interface BatchItem {
 export class LikeAggregatorService implements OnModuleInit {
   private readonly logger = new Logger(LikeAggregatorService.name);
 
+  // event like/unlike ทั้งหมด
+  private totalEventsProcessed = 0;
+  // จํานวนที่ เขียนลง db จริง
+  private totalWriteOps = 0;
+
   constructor(
     @InjectModel(Post.name) private readonly postModel: Model<Post>,
     @Inject('REDIS_CLIENT') private readonly redis: Redis,
@@ -32,12 +37,28 @@ export class LikeAggregatorService implements OnModuleInit {
 
     // รวมจํานวนไลก์ ของเเต่ละ post
     const aggregated = this.aggregateDeltas(items);
+    // ดึงจํานวน key ออกมาเพื่อนําจํานวน writeOps ที่จะต้องเขียนลง db กี่ครั้ง
+    const writeOpsThisFlush = Object.keys(aggregated).length;
 
     // batch ลง mongo ทั้งหมด
     await this.bulkUpdateLikes(aggregated);
 
+    this.totalEventsProcessed += items.length;
+    this.totalWriteOps += writeOpsThisFlush;
+
+    // หาอัตราส่วนการลดจํานวนครั้งในการเขียนลงใน db เมื่อเทียบกับ event ทั้งหมด/จํานวนที่เขียนล db จริง
+    // เช่น like = 1000 เเต่เขียนลง db เเค่ 1 ครั้ง ; 1000/1 = 1000x เท่ากับลดการเขียนลงไป 1000เท่า
+    // ถ้ากระจายหลาย post reduction ratio จะลดตํ่าลง, ถ้า post เดียว reduction ratio จะสูง
+    const reductionRatio =
+      this.totalWriteOps > 0
+        ? (this.totalEventsProcessed / this.totalWriteOps).toFixed(1)
+        : 'N/A';
+
     this.logger.log(
-      `✅ Flushed ${items.length} like events → ${Object.keys(aggregated).length} posts updated`,
+      `✅ Flushed ${items.length} like events → ${writeOpsThisFlush} posts updated`,
+    );
+    this.logger.log(
+      `📊 [Cumulative] events=${this.totalEventsProcessed} writeOps=${this.totalWriteOps} reduction=${reductionRatio}x`,
     );
   }
 

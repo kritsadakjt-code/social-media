@@ -34,6 +34,7 @@ import { PostsService } from './posts.service';
         }),
         inject: [ConfigService],
       },
+      // ไม่ได้ใช้เเล้ว เพราะเปลี่ยน getFeed ไปใช้ grpc
       {
         name: 'FEED_SERVICE',
         imports: [ConfigModule],
@@ -49,6 +50,19 @@ import { PostsService } from './posts.service';
           },
         }),
         inject: [ConfigService],
+      },
+      {
+        name: 'FEED_SERVICE_GRPC',
+        imports: [ConfigModule],
+        inject: [ConfigService],
+        useFactory: (config: ConfigService) => ({
+          transport: Transport.GRPC,
+          options: {
+            package: 'feed',
+            protoPath: join(process.cwd(), 'libs/shared/src/proto/feed.proto'),
+            url: `${config.get('FEED_SERVICE_HOST', '127.0.0.1')}:${config.get('FEED_SERVICE_PORT', 50056)}`,
+          },
+        }),
       },
     ]),
   ],

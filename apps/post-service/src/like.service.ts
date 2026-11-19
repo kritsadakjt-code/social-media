@@ -8,11 +8,26 @@ import { ClientKafka, RpcException } from '@nestjs/microservices';
 import { PostLikedSchema, registry } from '@app/shared';
 import { SchemaType } from '@kafkajs/confluent-schema-registry';
 import { status } from '@grpc/grpc-js';
+import { MongoServerError } from 'mongodb';
 
 @Injectable()
 export class LikeService {
   private postLikedSchemaId!: number;
   private readonly logger = new Logger(LikeService.name);
+
+  // cache ค่าโหมดไว้ 1 วิ ไม่ให้ GET Redis ทุก request (ทั้งสองโหมดจ่ายต้นทุนเท่ากัน)
+  private writeMode: 'batch' | 'direct' = 'batch';
+  private writeModeCheckedAt = 0;
+
+  private async getWriteMode(): Promise<'batch' | 'direct'> {
+    const now = Date.now();
+    if (now - this.writeModeCheckedAt > 1000) {
+      this.writeModeCheckedAt = now;
+      const v = await this.redis.get('config:like_write_mode');
+      this.writeMode = v === 'direct' ? 'direct' : 'batch';
+    }
+    return this.writeMode;
+  }
 
   constructor(
     @InjectModel(Like.name) private readonly likeModel: Model<LikeDocument>,
@@ -61,22 +76,33 @@ export class LikeService {
       });
     }
 
-    // เช็คว่าเคยกดไลก์แล้วหรือยัง;
-    const existingLike = await this.likeModel.findOne({ postId, userId });
+    // เช็คว่าเคยกดไลก์แล้วหรือยัง โดยใช้วิธี atomic ป้องกัน race condition ของปัญหา read-then-write
+    const deleted = await this.likeModel.findOneAndDelete({ postId, userId });
 
     let liked: boolean;
     let likeDelta: number;
 
-    if (existingLike) {
+    if (deleted) {
       // ถ้าเคยกดไลก์เเล้ว Unlike ลบ like record ออก
-      await this.likeModel.deleteOne({ postId, userId });
+      // await this.likeModel.deleteOne({ postId, userId });
       liked = false;
       likeDelta = -1;
     } else {
-      // ยังไม่เคยกดไลก์ สร้าง like record ใหม่
-      await this.likeModel.create({ postId, userId });
-      liked = true;
-      likeDelta = 1;
+      // ยังไม่ like → สร้างใหม่ (atomic ด้วย unique index)
+      try {
+        await this.likeModel.create({ postId, userId });
+        liked = true;
+        likeDelta = 1;
+      } catch (err: unknown) {
+        // ป้องกันไม่ + หากมีคนสร้างไปแล้ว ระหว่างนั้น
+        // treat เป็น like สำเร็จ
+        if (err instanceof MongoServerError && err.code === 11000) {
+          liked = true;
+          likeDelta = 0;
+        } else {
+          throw err;
+        }
+      }
     }
 
     // update redis counter
@@ -95,11 +121,24 @@ export class LikeService {
     // expire 7 วัน
     await this.redis.expire(redisCounterKey, 604800);
 
-    // Push ลง Batch Queue (จะ sync ลง MongoDB ทีหลัง) lpush ให้ข้อมูลใหม่อยู่ซ้ายสุด
-    await this.redis.lpush(
-      'likes:batch:queue',
-      JSON.stringify({ postId, delta: likeDelta }),
-    );
+    // [A/B BENCHMARK] สลับวิธีเขียน delta ลง MongoDB ตอนรันได้ผ่าน Redis key
+    //   batch  (default) = push ลงคิว แล้ว like-aggregator flush ทุก 5 วิ
+    //   direct           = $inc บน post document ทันทีทุก request (baseline เทียบ)
+    // ลบ block นี้ทิ้งหลังวัดเสร็จ ถ้าไม่อยากให้ production path มี Redis GET เพิ่ม
+    if (likeDelta !== 0) {
+      if ((await this.getWriteMode()) === 'direct') {
+        await this.postModel.updateOne(
+          { _id: postId },
+          { $inc: { likes: likeDelta } },
+        );
+      } else {
+        // Push ลง Batch Queue (จะ sync ลง MongoDB ทีหลัง) lpush ให้ข้อมูลใหม่อยู่ซ้ายสุด
+        await this.redis.lpush(
+          'likes:batch:queue',
+          JSON.stringify({ postId, delta: likeDelta }),
+        );
+      }
+    }
 
     // ส่ง emit kafka ตอนกดไลก์ให้ noti
     if (liked) {
